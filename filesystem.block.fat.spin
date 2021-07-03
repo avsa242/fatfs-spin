@@ -33,7 +33,7 @@ CON
     SECTPERFAT      = BOOTRECORD+$24            ' 4
     FLAGS           = BOOTRECORD+$28            ' 2
         FATMIRROR   = 15
-        ACTIVEFAT   = 8                         ' LOWER 7 BITS
+        ACTVFAT     = 8                         ' LOWER 7 BITS
     FAT32VERS       = BOOTRECORD+$2A            ' 2
     ROOTDIRCLUST    = BOOTRECORD+$2C            ' 4
     FSINFOSECT      = BOOTRECORD+$30            ' 2
@@ -71,6 +71,11 @@ PUB Init(ptr_fatimg)
 PUB DeInit{}
     _ptr_fatimg := 0
     bytefill(@_vol_name, 0, VOLNAME_LEN)
+
+PUB ActiveFAT{}: fat_nr
+' Active FAT copy
+'   Returns: u7
+    return (byte[_ptr_fatimg][FLAGS] >> ACTVFAT) & $7F
 
 PUB BackupBootSect{}: s
 ' Backup boot sector number
