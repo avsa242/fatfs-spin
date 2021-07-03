@@ -64,6 +64,11 @@ PUB DeInit{}
     _ptr_fatimg := 0
     bytefill(@_vol_name, 0, VOLNAME_LEN)
 
+PUB FATFlags{}: f
+' Flags
+'   Returns: word
+    bytemove(@f, _ptr_fatimg+FLAGS, 2)
+
 PUB Heads{}: h
 ' Number of heads
 '   Returns: word
