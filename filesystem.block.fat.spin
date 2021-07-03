@@ -52,6 +52,9 @@ VAR
     long _ptr_fatimg
     byte _vol_name[11]
 
+PUB Null{}
+' This is not a top-level object
+
 PUB Init(ptr_fatimg)
 ' Initialize 
     _ptr_fatimg := ptr_fatimg
