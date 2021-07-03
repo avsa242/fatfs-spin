@@ -65,6 +65,10 @@ PUB LogicalSectorBytes{}: b
 '   NOTE: Values returned should be powers of 2 only
     bytemove(@b, _ptr_fatimg+BYTESPERLOGISECT, 2)
 
+PUB MediaType{}: t
+' Media type of FAT
+    return byte[_ptr_fatimg][MEDIADESC]
+
 PUB NumberFATs{}: n
 ' Number of copies of FAT
     return byte[_ptr_fatimg][FATCOPIES]
