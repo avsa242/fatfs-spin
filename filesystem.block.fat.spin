@@ -19,7 +19,8 @@ CON
 
     BOOTRECORD      = 0
     JMPBOOT         = BOOTRECORD+$00            ' 3
-    OEMNAME         = BOOTRECORD+$03            ' 8
+    FATOEMNAME      = BOOTRECORD+$03            ' 8
+    FATOEMNAME_LEN  = 8                         ' text + NUL
     BYTESPERLOGISECT= BOOTRECORD+$0B            ' 2
     SECPERCLUST     = BOOTRECORD+$0D            ' 1
     RSVDSECTS       = BOOTRECORD+$0E            ' 2
@@ -56,6 +57,7 @@ VAR
     byte _vol_name[VOLNAME_LEN]
     byte _fat_name[FATNAME_LEN]
     byte _boot_code[BOOTCODE_LEN]
+    byte _oem_name[FATOEMNAME_LEN+1]
 
 PUB Null{}
 ' This is not a top-level object
@@ -128,6 +130,13 @@ PUB MediaType{}: t
 PUB NumberFATs{}: n
 ' Number of copies of FAT
     return byte[_ptr_fatimg][FATCOPIES]
+
+PUB OEMName{}: ptr_name
+' OEM name string
+'   Returns: pointer to string buffer
+    bytefill(@_oem_name, 0, FATOEMNAME_LEN+1)
+    bytemove(@_oem_name, _ptr_fatimg+FATOEMNAME, FATOEMNAME_LEN+1)
+    return @_oem_name
 
 PUB Partition1St{}: sect
 ' Partition 1 starting offset
