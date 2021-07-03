@@ -107,6 +107,11 @@ PUB ReservedSectors{}: r
 ' Number of reserved sectors
     bytemove(@r, _ptr_fatimg+RSVDSECTS, 2)
 
+PUB RootDirCluster{}: c
+' Cluster number of the start of the root directory
+'   Returns: long
+    bytemove(@c, _ptr_fatimg+ROOTDIRCLUST, 4)
+
 PUB SectorsPerCluster{}: spc
 ' Sectors per cluster
 '   Returns: byte
