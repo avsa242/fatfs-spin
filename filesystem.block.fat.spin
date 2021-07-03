@@ -74,6 +74,11 @@ PUB FATFlags{}: f
 '   Returns: word
     bytemove(@f, _ptr_fatimg+FLAGS, 2)
 
+PUB FInfoSector{}: s
+' Filesystem info sector
+'   Returns: word
+    bytemove(@s, _ptr_fatimg+FSINFOSECT, 2)
+
 PUB Heads{}: h
 ' Number of heads
 '   Returns: word
