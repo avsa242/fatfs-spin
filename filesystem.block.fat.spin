@@ -69,11 +69,10 @@ PUB NumberFATs{}: n
 ' Number of copies of FAT
     return byte[_ptr_fatimg][FATCOPIES]
 
-PUB Partition1St{}: sect | i
+PUB Partition1St{}: sect
 ' Partition 1 starting offset
 '   Returns: long
-    repeat i from 3 to 0
-        sect.byte[i] := byte[_ptr_fatimg][PART1START+i]
+    bytemove(@sect, _ptr_fatimg+PART1START, 4)
 
 PUB ReservedSectors{}: r
 ' Number of reserved sectors
