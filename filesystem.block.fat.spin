@@ -45,7 +45,7 @@ CON
     BOOTCODE        = BOOTRECORD+$5A            ' 420 BYTES
     BOOTCODE_LEN    = 420
     MBRSIG          = $1FE
-    SIG             = $55AA
+    SIG             = $AA55
 
     FSTYPE_FAT16    = $36                       ' "FAT16"
     FSTYPE_FAT32    = $52                       ' "FAT32"
@@ -168,6 +168,12 @@ PUB Sig0x29Valid{}: bool
 ' Flag indicating signature byte 0x29 is valid
 '   Returns: boolean
     return byte[_ptr_fatimg][SIGX29] == $29
+
+PUB Sig0xAA55Valid{}: bool
+' Flag indicating signature word 0xAA55 is valid
+'   Returns: boolean
+    bytemove(@bool, _ptr_fatimg+MBRSIG, 2)
+    return (bool == SIG)
 
 PUB VolumeName{}: ptr_str
 ' Volume name of FAT partition
