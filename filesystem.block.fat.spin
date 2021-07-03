@@ -64,6 +64,11 @@ PUB DeInit{}
     _ptr_fatimg := 0
     bytefill(@_vol_name, 0, VOLNAME_LEN)
 
+PUB Heads{}: h
+' Number of heads
+'   Returns: word
+    bytemove(@h, _ptr_fatimg+NRHEADS, 2)
+
 PUB LogicalSectorBytes{}: b
 ' Size of logical sector, in bytes
 '   Returns: word
