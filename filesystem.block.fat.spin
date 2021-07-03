@@ -93,6 +93,11 @@ PUB SectorsPerCluster{}: spc
 '   NOTE: Values returned should be powers of 2 only
     return byte[_ptr_fatimg][SECPERCLUST]
 
+PUB SectorsPerTrack{}: spt
+' Sectors per track
+'   Retunrs: word
+    bytemove(@spt, _ptr_fatimg+SECTPERTRK, 2)
+
 PUB VolumeName{}: ptr_str
 ' Volume name of FAT partition
 '   Returns: pointer to 11-char string
