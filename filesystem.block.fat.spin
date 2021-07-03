@@ -94,6 +94,11 @@ PUB HiddenSectors{}: s
 '   Returns: long
     bytemove(@s, _ptr_fatimg+NRHIDDENSECT, 4)
 
+PUB LogicalDrvNum{}: n
+' Logical drive number of partition
+'   Returns: byte
+    return byte[_ptr_fatimg][PARTLOGICLDN]
+
 PUB LogicalSectorBytes{}: b
 ' Size of logical sector, in bytes
 '   Returns: word
