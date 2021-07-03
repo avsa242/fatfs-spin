@@ -143,6 +143,11 @@ PUB SectorsPerTrack{}: spt
 '   Retunrs: word
     bytemove(@spt, _ptr_fatimg+SECTPERTRK, 2)
 
+PUB Sig0x29Valid{}: bool
+' Flag indicating signature byte 0x29 is valid
+'   Returns: boolean
+    return byte[_ptr_fatimg][SIGX29] == $29
+
 PUB VolumeName{}: ptr_str
 ' Volume name of FAT partition
 '   Returns: pointer to 11-char string
