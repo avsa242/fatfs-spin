@@ -64,6 +64,11 @@ PUB DeInit{}
     _ptr_fatimg := 0
     bytefill(@_vol_name, 0, VOLNAME_LEN)
 
+PUB BackupBootSect{}: s
+' Backup boot sector number
+'   Returns: word
+    bytemove(@s, _ptr_fatimg+BKUPBOOTSECT, 2)
+
 PUB FAT32Version{}: v
 ' Version of FAT32 driver
 '   Returns word [major..minor]
