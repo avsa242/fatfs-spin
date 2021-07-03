@@ -32,6 +32,8 @@ CON
     SECTPERPART     = BOOTRECORD+$20            ' 4
     SECTPERFAT      = BOOTRECORD+$24            ' 4
     FLAGS           = BOOTRECORD+$28            ' 2
+        FATMIRROR   = 15
+        ACTIVEFAT   = 8                         ' LOWER 7 BITS
     FAT32VERS       = BOOTRECORD+$2A            ' 2
     ROOTDIRCLUST    = BOOTRECORD+$2C            ' 4
     FSINFOSECT      = BOOTRECORD+$30            ' 2
@@ -96,6 +98,12 @@ PUB FATFlags{}: f
 ' Flags
 '   Returns: word
     bytemove(@f, _ptr_fatimg+FLAGS, 2)
+
+PUB FATMirroring{}: state
+' Flag indicating FAT mirroring is enabled
+'   Returns: boolean
+    bytemove(@state, _ptr_fatimg+FLAGS, 2)
+    return ((state >> FATMIRROR) & 1) == 0
 
 PUB FInfoSector{}: s
 ' Filesystem info sector
