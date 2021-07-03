@@ -118,6 +118,11 @@ PUB Partition1St{}: sect
 '   Returns: long
     bytemove(@sect, _ptr_fatimg+PART1START, 4)
 
+PUB PartSN{}: s
+' Partition serial number
+'   Returns: long
+    bytemove(@s, _ptr_fatimg+PART_SN, 4)
+
 PUB ReservedSectors{}: r
 ' Number of reserved sectors
     bytemove(@r, _ptr_fatimg+RSVDSECTS, 2)
