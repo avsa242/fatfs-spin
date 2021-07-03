@@ -65,6 +65,10 @@ PUB LogicalSectorBytes{}: b
 '   NOTE: Values returned should be powers of 2 only
     bytemove(@b, _ptr_fatimg+BYTESPERLOGISECT, 2)
 
+PUB NumberFATs{}: n
+' Number of copies of FAT
+    return byte[_ptr_fatimg][FATCOPIES]
+
 PUB Partition1St{}: sect | i
 ' Partition 1 starting offset
 '   Returns: long
