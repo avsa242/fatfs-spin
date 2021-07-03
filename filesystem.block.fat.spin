@@ -103,6 +103,11 @@ PUB SectorsPerCluster{}: spc
 '   NOTE: Values returned should be powers of 2 only
     return byte[_ptr_fatimg][SECPERCLUST]
 
+PUB SectorsPerFAT{}: spf
+' Sectors per FAT
+'   Returns: long
+    bytemove(@spf, _ptr_fatimg+SECTPERFAT, 4)
+
 PUB SectorsPerTrack{}: spt
 ' Sectors per track
 '   Retunrs: word
