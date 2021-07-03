@@ -50,6 +50,15 @@ CON
     MBRSIG          = $1FE
     SIG             = $AA55
 
+    FSINFOSIG1      = $000
+    FSISIG1         = $41615252                 ' RRaA
+    FSINFOSIG2      = $1E4
+    FSISIG2         = $61417272                 ' rrAa
+    LASTKNWNFRCLST  = $1E8
+    LASTALLOCCLST   = $1EC
+    FSINFOSIG3      = $1FC
+    FSISIG3         = $AA550000
+
     FSTYPE_FAT16    = $36                       ' "FAT16"
     FSTYPE_FAT32    = $52                       ' "FAT32"
 
@@ -114,6 +123,22 @@ PUB FInfoSector{}: s
 ' Filesystem info sector
 '   Returns: word
     bytemove(@s, _ptr_fatimg+FSINFOSECT, 2)
+
+PUB FISSigValidMask{}: m | tmp
+' FS information signatures valid
+'   Returns: 3bit mask [SIG3..SIG2..SIG1]
+'       0: signature not valid, 1: signature valid
+    bytemove(@tmp, _ptr_fatimg+FSINFOSIG1, 4)
+    if tmp == FSISIG1
+        m |= %001
+
+    bytemove(@tmp, _ptr_fatimg+FSINFOSIG2, 4)
+    if tmp == FSISIG2
+        m |= %010
+
+    bytemove(@tmp, _ptr_fatimg+FSINFOSIG3, 4)
+    if tmp == FSISIG3
+        m |= %100
 
 PUB Heads{}: h
 ' Number of heads
