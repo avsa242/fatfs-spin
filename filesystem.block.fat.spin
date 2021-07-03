@@ -69,6 +69,11 @@ PUB Heads{}: h
 '   Returns: word
     bytemove(@h, _ptr_fatimg+NRHEADS, 2)
 
+PUB HiddenSectors{}: s
+' Number of hidden sectors in partition
+'   Returns: long
+    bytemove(@s, _ptr_fatimg+NRHIDDENSECT, 4)
+
 PUB LogicalSectorBytes{}: b
 ' Size of logical sector, in bytes
 '   Returns: word
