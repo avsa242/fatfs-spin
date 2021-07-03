@@ -41,6 +41,7 @@ CON
     VOLNAME         = BOOTRECORD+$47            ' 11 BYTES
     VOLNAME_LEN     = 11
     FATNAME         = BOOTRECORD+$52            ' 8 BYTES
+    FATNAME_LEN     = 8
     BOOTCODE        = BOOTRECORD+$5A            ' 420 BYTES
     MBRSIG          = $1FE
     SIG             = $55AA
@@ -52,6 +53,7 @@ VAR
 
     long _ptr_fatimg
     byte _vol_name[VOLNAME_LEN]
+    byte _fat_name[FATNAME_LEN]
 
 PUB Null{}
 ' This is not a top-level object
@@ -69,6 +71,12 @@ PUB BackupBootSect{}: s
 '   Returns: word
     bytemove(@s, _ptr_fatimg+BKUPBOOTSECT, 2)
 
+PUB FAT32Name{}: s
+' FAT name (usually FAT32)
+'   Returns: pointer to string buffer
+    bytemove(@_fat_name, _ptr_fatimg+FATNAME, FATNAME_LEN)
+    return @_fat_name
+    
 PUB FAT32Version{}: v
 ' Version of FAT32 driver
 '   Returns word [major..minor]
