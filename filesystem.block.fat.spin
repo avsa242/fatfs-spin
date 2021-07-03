@@ -43,6 +43,7 @@ CON
     FATNAME         = BOOTRECORD+$52            ' 8 BYTES
     FATNAME_LEN     = 8
     BOOTCODE        = BOOTRECORD+$5A            ' 420 BYTES
+    BOOTCODE_LEN    = 420
     MBRSIG          = $1FE
     SIG             = $55AA
 
@@ -54,6 +55,7 @@ VAR
     long _ptr_fatimg
     byte _vol_name[VOLNAME_LEN]
     byte _fat_name[FATNAME_LEN]
+    byte _boot_code[BOOTCODE_LEN]
 
 PUB Null{}
 ' This is not a top-level object
@@ -70,6 +72,12 @@ PUB BackupBootSect{}: s
 ' Backup boot sector number
 '   Returns: word
     bytemove(@s, _ptr_fatimg+BKUPBOOTSECT, 2)
+
+PUB BootCodePtr{}: ptr
+' Boot code
+'   Returns: pointer to buffer containing boot code
+    bytemove(@_boot_code, _ptr_fatimg+BOOTCODE, BOOTCODE_LEN)
+    return @_boot_code
 
 PUB FAT32Name{}: s
 ' FAT name (usually FAT32)
