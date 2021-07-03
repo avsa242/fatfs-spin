@@ -71,6 +71,10 @@ PUB Partition1St{}: sect | i
     repeat i from 3 to 0
         sect.byte[i] := byte[_ptr_fatimg][PART1START+i]
 
+PUB ReservedSectors{}: r
+' Number of reserved sectors
+    bytemove(@r, _ptr_fatimg+RSVDSECTS, 2)
+
 PUB SectorsPerCluster{}: spc
 ' Sectors per cluster
 '   Returns: byte
