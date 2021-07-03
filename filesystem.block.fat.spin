@@ -39,6 +39,7 @@ CON
     SIGX29          = BOOTRECORD+$42            ' 1
     PART_SN         = BOOTRECORD+$43            ' LE LONG
     VOLNAME         = BOOTRECORD+$47            ' 11 BYTES
+    VOLNAME_LEN     = 11
     FATNAME         = BOOTRECORD+$52            ' 8 BYTES
     BOOTCODE        = BOOTRECORD+$5A            ' 420 BYTES
     MBRSIG          = $1FE
@@ -50,7 +51,7 @@ CON
 VAR
 
     long _ptr_fatimg
-    byte _vol_name[11]
+    byte _vol_name[VOLNAME_LEN]
 
 PUB Null{}
 ' This is not a top-level object
@@ -58,6 +59,10 @@ PUB Null{}
 PUB Init(ptr_fatimg)
 ' Initialize 
     _ptr_fatimg := ptr_fatimg
+
+PUB DeInit{}
+    _ptr_fatimg := 0
+    bytefill(@_vol_name, 0, VOLNAME_LEN)
 
 PUB LogicalSectorBytes{}: b
 ' Size of logical sector, in bytes
@@ -91,9 +96,9 @@ PUB SectorsPerCluster{}: spc
 PUB VolumeName{}: ptr_str
 ' Volume name of FAT partition
 '   Returns: pointer to 11-char string
-    bytefill(@_vol_name, 0, 11)                 ' clear string buffer
+    bytefill(@_vol_name, 0, VOLNAME_LEN)                 ' clear string buffer
 
     ' copy volume name string from boot record to string buffer
-    bytemove(@_vol_name, _ptr_fatimg+VOLNAME, 11)
+    bytemove(@_vol_name, _ptr_fatimg+VOLNAME, VOLNAME_LEN)
     return @_vol_name
 
