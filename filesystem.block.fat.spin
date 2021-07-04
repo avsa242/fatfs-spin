@@ -73,8 +73,10 @@ VAR
 PUB Null{}
 ' This is not a top-level object
 
-PUB Init(ptr_fatimg)
-' Initialize 
+PUB Init(ptr_fatimg, sector_sz)
+' Initialize
+'   ptr_fatimg: pointer to FAT sector buffer
+'   sector_sz: data bytes per sector
     _ptr_fatimg := ptr_fatimg
 
 PUB DeInit{}
@@ -176,8 +178,8 @@ PUB OEMName{}: ptr_name
     bytemove(@_oem_name, _ptr_fatimg+FATOEMNAME, FATOEMNAME_LEN+1)
     return @_oem_name
 
-PUB Partition1St{}: sect
-' Partition 1 starting offset
+PUB Partition1St{}: sect    'XXX flawed - once the block pointed to by this long in the FAT image
+' Partition 1 starting offset   ' is read, this value is no longer valid
 '   Returns: long
     bytemove(@sect, _ptr_fatimg+PART1START, 4)
 
