@@ -1,6 +1,7 @@
 CON
 
     BYTESPERSECT    = 512
+    DIRSZ           = 32
 
 ' offsets within FS
     MBR             = 0
@@ -63,12 +64,63 @@ CON
     FSTYPE_FAT32    = $52                       ' "FAT32"
 
 VAR
+    'xxx make a complete structure - the size of the sector?
 
     long _ptr_fatimg
-    byte _vol_name[VOLNAME_LEN]
-    byte _fat_name[FATNAME_LEN]
+    word _dir_sz
+
+    ' filesystem structure
+    long _clust_shf
+    long _clust_total
+    long _clust_rtdir_st
+    long _clust_sz
+
+    long _data_regn
+    long _endofchain
+    long _sect_fat1_st
+    long _part_sn
+    long _part_st
+    long _rootdir
+    long _rootdirend
+    long _root_ents
+    long _sect_hidn
+    long _sect_per_fat
+    long _sect_rtdir_st
+    long _sig_fsi1
+    long _sig_fsi2
+    long _sig_fsi3
+
+    word _fat_actv
+    word _fat_flags
+    word _fat_ver
+    word _nr_heads
+    word _rsvd
+    word _sect_bkupboot
+    word _sect_bytes
+    word _sect_fsinfo
+    word _sect_rsvd
+
+    word _sect_sz 'xxx some method to compare this to requested sect size on Init()?
+    word _sect_per_part
+    word _sect_per_trk
+    word _sigxaa55
+
+    byte _drv_num
+    byte _fat_medtyp
+    byte _nr_fats
+    byte _sect_per_clust 'xxx check is a power of 2
+    byte _sigx29
+    byte _fstype[8] 'xxx just one byte and store 0 or 1?
+    byte _twofats
+
     byte _boot_code[BOOTCODE_LEN]
-    byte _oem_name[FATOEMNAME_LEN+1]
+    byte _str_fatnm[FATNAME_LEN+1]
+    byte _str_oem_nm[FATOEMNAME_LEN+1]
+    byte _str_vol_nm[VOLNAME_LEN+1]
+
+OBJ
+
+    math    : "math.int"
 
 PUB Null{}
 ' This is not a top-level object
@@ -78,163 +130,207 @@ PUB Init(ptr_fatimg, sector_sz)
 '   ptr_fatimg: pointer to FAT sector buffer
 '   sector_sz: data bytes per sector
     _ptr_fatimg := ptr_fatimg
+    _dir_sz := DIRSZ
 
 PUB DeInit{}
+
     _ptr_fatimg := 0
-    bytefill(@_vol_name, 0, VOLNAME_LEN)
+
+PUB SyncPart{}
+
+    bytemove(@_part_st, _ptr_fatimg+PART1START, 4)
+
+PUB SyncFS{}
+
+    'xxx create 1:1 structure in VAR the full size of the BDB? then a simple byte/word/longmove
+    ' of the whole thing
+    ' xxx maybe not - not every datum is by itself in a byte
+    _fat_actv := (byte[_ptr_fatimg][FLAGS] >> ACTVFAT) & $7F
+    bytemove(@_sect_bkupboot, _ptr_fatimg+BKUPBOOTSECT, 2)
+    bytemove(@_boot_code, _ptr_fatimg+BOOTCODE, BOOTCODE_LEN)
+    bytemove(@_str_fatnm, _ptr_fatimg+FATNAME, FATNAME_LEN)
+    bytemove(@_fat_ver, _ptr_fatimg+FAT32VERS, 2)
+    bytemove(@_fat_flags, _ptr_fatimg+FLAGS, 2) ' does FATFlags() and FATMirroring()
+    bytemove(@_sect_fsinfo, _ptr_fatimg+FSINFOSECT, 2)
+    bytemove(@_sig_fsi1, _ptr_fatimg+FSINFOSIG1, 4)
+    bytemove(@_sig_fsi2, _ptr_fatimg+FSINFOSIG2, 4)
+    bytemove(@_sig_fsi3, _ptr_fatimg+FSINFOSIG3, 4)
+    bytemove(@_nr_heads, _ptr_fatimg+NRHEADS, 2)
+    bytemove(@_sect_hidn, _ptr_fatimg+NRHIDDENSECT, 4)
+    _drv_num := byte[_ptr_fatimg][PARTLOGICLDN]
+    bytemove(@_sect_bytes, _ptr_fatimg+BYTESPERLOGISECT, 2)
+    _fat_medtyp := byte[_ptr_fatimg][MEDIADESC]
+    _nr_fats := byte[_ptr_fatimg][FATCOPIES]
+    bytefill(@_str_oem_nm, 0, FATOEMNAME_LEN+1)
+     bytemove(@_str_oem_nm, _ptr_fatimg+FATOEMNAME, FATOEMNAME_LEN+1)
+'    bytemove(@_part_st, _ptr_fatimg+PART1START, 4)
+    bytemove(@_sect_per_part, _ptr_fatimg+SECTPERPART, 4)
+    bytemove(@_part_sn, _ptr_fatimg+PART_SN, 4)
+    bytemove(@_sect_rsvd, _ptr_fatimg+RSVDSECTS, 2)
+    bytemove(@_clust_rtdir_st, _ptr_fatimg+ROOTDIRCLUST, 4)
+    _sect_per_clust := byte[_ptr_fatimg][SECPERCLUST]
+    bytemove(@_sect_per_fat, _ptr_fatimg+SECTPERFAT, 4)
+    bytemove(@_sect_per_trk, _ptr_fatimg+SECTPERTRK, 2)
+    _sigx29 := byte[_ptr_fatimg][SIGX29]
+    bytemove(@_sigxaa55, _ptr_fatimg+MBRSIG, 2)
+    bytefill(@_str_vol_nm, 0, VOLNAME_LEN)                 ' clear string buffer
+    ' copy volume name string from boot record to string buffer
+    bytemove(@_str_vol_nm, _ptr_fatimg+VOLNAME, VOLNAME_LEN)
+
+    _sect_fat1_st := _part_st + _sect_rsvd
+    _clust_shf := math.log2(_sect_per_clust)
+
+    _root_ents := 16 << _clust_shf 'xxx where's 16 come from?
+    _data_regn := (_sect_fat1_st + 2 * _sect_per_fat) - 2 * _sect_per_clust
+    _rootdir := (_data_regn << _clust_rtdir_st << _clust_shf) << math.log2(_sect_sz)
+    _rootdirend := _rootdir + (_root_ents << math.log2(_dir_sz))
+    _clust_total := ((_sect_per_part - _data_regn + _part_st) >> _clust_shf)
+    _sect_rtdir_st := _sect_fat1_st + (_nr_fats * _sect_per_fat)
 
 PUB ActiveFAT{}: fat_nr
 ' Active FAT copy
 '   Returns: u7
-    return (byte[_ptr_fatimg][FLAGS] >> ACTVFAT) & $7F
+    return _fat_actv & $7F
 
 PUB BackupBootSect{}: s
 ' Backup boot sector number
 '   Returns: word
-    bytemove(@s, _ptr_fatimg+BKUPBOOTSECT, 2)
+    return _sect_bkupboot
 
 PUB BootCodePtr{}: ptr
 ' Boot code
 '   Returns: pointer to buffer containing boot code
-    bytemove(@_boot_code, _ptr_fatimg+BOOTCODE, BOOTCODE_LEN)
     return @_boot_code
 
 PUB FAT32Name{}: s
 ' FAT name (usually FAT32)
 '   Returns: pointer to string buffer
-    bytemove(@_fat_name, _ptr_fatimg+FATNAME, FATNAME_LEN)
-    return @_fat_name
+    return @_str_fatnm
     
 PUB FAT32Version{}: v
 ' Version of FAT32 driver
 '   Returns word [major..minor]
-    bytemove(@v, _ptr_fatimg+FAT32VERS, 2)
+    return _fat_ver
 
 PUB FATFlags{}: f
 ' Flags
 '   Returns: word
-    bytemove(@f, _ptr_fatimg+FLAGS, 2)
+    return _fat_flags
 
 PUB FATMirroring{}: state
 ' Flag indicating FAT mirroring is enabled
 '   Returns: boolean
-    bytemove(@state, _ptr_fatimg+FLAGS, 2)
-    return ((state >> FATMIRROR) & 1) == 0
+    return ((_fat_flags >> FATMIRROR) & 1) == 0
 
 PUB FInfoSector{}: s
 ' Filesystem info sector
 '   Returns: word
-    bytemove(@s, _ptr_fatimg+FSINFOSECT, 2)
+    return _sect_fsinfo
 
-PUB FISSigValidMask{}: m | tmp
+PUB FISSigValidMask{}: m
 ' FS information signatures valid
 '   Returns: 3bit mask [SIG3..SIG2..SIG1]
 '       0: signature not valid, 1: signature valid
-    bytemove(@tmp, _ptr_fatimg+FSINFOSIG1, 4)
-    if tmp == FSISIG1
+    if _sig_fsi1 == FSISIG1
         m |= %001
 
-    bytemove(@tmp, _ptr_fatimg+FSINFOSIG2, 4)
-    if tmp == FSISIG2
+    if _sig_fsi2 == FSISIG2
         m |= %010
 
-    bytemove(@tmp, _ptr_fatimg+FSINFOSIG3, 4)
-    if tmp == FSISIG3
+    if _sig_fsi3 == FSISIG3
         m |= %100
 
 PUB Heads{}: h
 ' Number of heads
 '   Returns: word
-    bytemove(@h, _ptr_fatimg+NRHEADS, 2)
+    return _nr_heads
 
 PUB HiddenSectors{}: s
 ' Number of hidden sectors in partition
 '   Returns: long
-    bytemove(@s, _ptr_fatimg+NRHIDDENSECT, 4)
+    return _sect_hidn
 
 PUB LogicalDrvNum{}: n
 ' Logical drive number of partition
 '   Returns: byte
-    return byte[_ptr_fatimg][PARTLOGICLDN]
+    return _drv_num
 
 PUB LogicalSectorBytes{}: b
 ' Size of logical sector, in bytes
 '   Returns: word
 '   NOTE: Values returned should be powers of 2 only
-    bytemove(@b, _ptr_fatimg+BYTESPERLOGISECT, 2)
+    return _sect_bytes
 
 PUB MediaType{}: t
 ' Media type of FAT
-    return byte[_ptr_fatimg][MEDIADESC]
+    return _fat_medtyp
 
 PUB NumberFATs{}: n
 ' Number of copies of FAT
-    return byte[_ptr_fatimg][FATCOPIES]
+    return _nr_fats
 
 PUB OEMName{}: ptr_name
 ' OEM name string
 '   Returns: pointer to string buffer
-    bytefill(@_oem_name, 0, FATOEMNAME_LEN+1)
-    bytemove(@_oem_name, _ptr_fatimg+FATOEMNAME, FATOEMNAME_LEN+1)
-    return @_oem_name
+    return @_str_oem_nm
 
-PUB Partition1St{}: sect    'XXX flawed - once the block pointed to by this long in the FAT image
-' Partition 1 starting offset   ' is read, this value is no longer valid
+PUB PartStart{}: sect
+' Partition starting offset
 '   Returns: long
-    bytemove(@sect, _ptr_fatimg+PART1START, 4)
+    return _part_st
 
 PUB PartSectors{}: s
 ' Sectors in partition
 '   Returns: long
-    bytemove(@s, _ptr_fatimg+SECTPERPART, 4)
+    return _sect_per_part
 
 PUB PartSN{}: s
 ' Partition serial number
 '   Returns: long
-    bytemove(@s, _ptr_fatimg+PART_SN, 4)
+    return _part_sn
 
 PUB ReservedSectors{}: r
 ' Number of reserved sectors
-    bytemove(@r, _ptr_fatimg+RSVDSECTS, 2)
+    return _sect_rsvd
 
 PUB RootDirCluster{}: c
 ' Cluster number of the start of the root directory
 '   Returns: long
-    bytemove(@c, _ptr_fatimg+ROOTDIRCLUST, 4)
+    return _clust_rtdir_st
+
+PUB RootDirSector{}: s
+' Starting sector of root directory entry
+'   Returns: long
+    return _sect_rtdir_st
 
 PUB SectorsPerCluster{}: spc
 ' Sectors per cluster
 '   Returns: byte
 '   NOTE: Values returned should be powers of 2 only
-    return byte[_ptr_fatimg][SECPERCLUST]
+    return _sect_per_clust
 
 PUB SectorsPerFAT{}: spf
 ' Sectors per FAT
 '   Returns: long
-    bytemove(@spf, _ptr_fatimg+SECTPERFAT, 4)
+    return _sect_per_fat
 
 PUB SectorsPerTrack{}: spt
 ' Sectors per track
 '   Retunrs: word
-    bytemove(@spt, _ptr_fatimg+SECTPERTRK, 2)
+    return _sect_per_trk
 
 PUB Sig0x29Valid{}: bool
 ' Flag indicating signature byte 0x29 is valid
 '   Returns: boolean
-    return byte[_ptr_fatimg][SIGX29] == $29
+    return _sigx29 == $29
 
 PUB Sig0xAA55Valid{}: bool
 ' Flag indicating signature word 0xAA55 is valid
 '   Returns: boolean
-    bytemove(@bool, _ptr_fatimg+MBRSIG, 2)
-    return (bool == SIG)
+    return (_sigxaa55 == SIG)
 
 PUB VolumeName{}: ptr_str
 ' Volume name of FAT partition
 '   Returns: pointer to 11-char string
-    bytefill(@_vol_name, 0, VOLNAME_LEN)                 ' clear string buffer
-
-    ' copy volume name string from boot record to string buffer
-    bytemove(@_vol_name, _ptr_fatimg+VOLNAME, VOLNAME_LEN)
-    return @_vol_name
+    return @_str_vol_nm
 
