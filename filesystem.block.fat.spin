@@ -77,6 +77,14 @@ CON
     FCLUST_L        = $1A
     FSZ             = $1C
 
+    ' file attributes
+    FARC            = 1 << 5
+    FSUBDIR         = 1 << 4
+    FVOL_NM         = 1 << 3
+    FSYSFIL         = 1 << 2
+    FHIDNFIL        = 1 << 1
+    FWRPROT         = 1
+
 VAR
 
     long _ptr_fatimg
@@ -158,7 +166,7 @@ PUB Init(ptr_fatimg, sector_sz)
 '   ptr_fatimg: pointer to FAT sector buffer
 '   sector_sz: data bytes per sector
     _ptr_fatimg := ptr_fatimg
-    _dir_sz := DIRSZ
+    _dir_sz := DIRSZ                            ' XXX static, for now
 
 PUB DeInit{}
 
@@ -170,7 +178,7 @@ PUB SyncPart{}
     bytemove(@_part_st, _ptr_fatimg+PART1START, 4)
 
 PUB SyncFile(fnum)
-' Synchronize directory entry data for file number fnum within currently active
+' Synchronize directory entry data for file number fnum with currently active
 '   sector buffer
     fnum := _ptr_fatimg + (fnum * $20)          ' calc offset for particular file
     bytefill(@_str_fn, 0, 9)                    ' clear string buffers
@@ -373,6 +381,11 @@ PUB HiddenSectors{}: s
 ' Number of hidden sectors in partition
 '   Returns: long
     return _sect_hidn
+
+PUB IsDirectory{}: bool
+' Flag indicating file is a (sub)directory
+'   Returns: boolean
+    return (fileattrs{} & FSUBDIR) <> 0
 
 PUB LogicalDrvNum{}: n
 ' Logical drive number of partition
