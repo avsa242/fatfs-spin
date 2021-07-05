@@ -1,7 +1,7 @@
 CON
 
     BYTESPERSECT    = 512
-    DIRSZ           = 32
+    DIRENT_SZ       = 32
 
 ' offsets within FS
     MBR             = 0
@@ -88,7 +88,6 @@ CON
 VAR
 
     long _ptr_fatimg
-    word _dir_sz
 
     ' BIOS parameter block (BPB)
     long _clust_shf
@@ -166,7 +165,6 @@ PUB Init(ptr_fatimg, sector_sz)
 '   ptr_fatimg: pointer to FAT sector buffer
 '   sector_sz: data bytes per sector
     _ptr_fatimg := ptr_fatimg
-    _dir_sz := DIRSZ                            ' XXX static, for now
 
 PUB DeInit{}
 
@@ -180,7 +178,7 @@ PUB SyncPart{}
 PUB SyncFile(fnum)
 ' Synchronize directory entry data for file number fnum with currently active
 '   sector buffer
-    fnum := _ptr_fatimg + (fnum * $20)          ' calc offset for particular file
+    fnum := _ptr_fatimg + (fnum * DIRENT_SZ)    ' calc offset for this file
     bytefill(@_str_fn, 0, 9)                    ' clear string buffers
     bytefill(@_str_fext, 0, 4)
 
@@ -219,7 +217,6 @@ PUB SyncBPB{}
     _nr_fats := byte[_ptr_fatimg][FATCOPIES]
     bytefill(@_str_oem_nm, 0, FATOEMNAME_LEN+1)
      bytemove(@_str_oem_nm, _ptr_fatimg+FATOEMNAME, FATOEMNAME_LEN+1)
-'    bytemove(@_part_st, _ptr_fatimg+PART1START, 4)
     bytemove(@_sect_per_part, _ptr_fatimg+SECTPERPART, 4)
     bytemove(@_part_sn, _ptr_fatimg+PART_SN, 4)
     bytemove(@_sect_rsvd, _ptr_fatimg+RSVDSECTS, 2)
@@ -229,7 +226,7 @@ PUB SyncBPB{}
     bytemove(@_sect_per_trk, _ptr_fatimg+SECTPERTRK, 2)
     _sigx29 := byte[_ptr_fatimg][SIGX29]
     bytemove(@_sigxaa55, _ptr_fatimg+MBRSIG, 2)
-    bytefill(@_str_vol_nm, 0, VOLNAME_LEN)                 ' clear string buffer
+    bytefill(@_str_vol_nm, 0, VOLNAME_LEN)      ' clear string buffer
     ' copy volume name string from boot record to string buffer
     bytemove(@_str_vol_nm, _ptr_fatimg+VOLNAME, VOLNAME_LEN)
 
@@ -239,7 +236,7 @@ PUB SyncBPB{}
     _root_ents := 16 << _clust_shf 'xxx where's 16 come from?
     _data_regn := (_sect_fat1_st + 2 * _sect_per_fat) - 2 * _sect_per_clust
     _rootdir := (_data_regn << _clust_rtdir_st << _clust_shf) << math.log2(_sect_sz)
-    _rootdirend := _rootdir + (_root_ents << math.log2(_dir_sz))
+    _rootdirend := _rootdir + (_root_ents << math.log2(DIRENT_SZ))
     _clust_total := ((_sect_per_part - _data_regn + _part_st) >> _clust_shf)
     _sect_rtdir_st := _sect_fat1_st + (_nr_fats * _sect_per_fat)
 
@@ -257,6 +254,11 @@ PUB BootCodePtr{}: ptr
 ' Boot code
 '   Returns: pointer to buffer containing boot code
     return @_boot_code
+
+PUB ClusterStart(clust_nr): sect
+' Starting sector of cluster number
+'   Returns: long
+    return _data_regn + (_sect_per_clust * clust_nr)
 
 PUB FAT32Name{}: s
 ' FAT name (usually FAT32)
