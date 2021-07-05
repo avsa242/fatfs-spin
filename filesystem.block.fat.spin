@@ -63,13 +63,26 @@ CON
     FSTYPE_FAT16    = $36                       ' "FAT16"
     FSTYPE_FAT32    = $52                       ' "FAT32"
 
+    ' directory
+    FNAME           = $00
+    FNEXT           = $08
+    FATTR           = $0B
+    FCREATE_TMS     = $0D
+    FCREATE_T       = $0E
+    FCREATE_D       = $10
+    FLASTXS_D       = $12
+    FCLUST_H        = $14
+    FLASTWR_T       = $16
+    FLASTWR_D       = $18
+    FCLUST_L        = $1A
+    FSZ             = $1C
+
 VAR
-    'xxx make a complete structure - the size of the sector?
 
     long _ptr_fatimg
     word _dir_sz
 
-    ' filesystem structure
+    ' BIOS parameter block (BPB)
     long _clust_shf
     long _clust_total
     long _clust_rtdir_st
@@ -110,13 +123,28 @@ VAR
     byte _nr_fats
     byte _sect_per_clust 'xxx check is a power of 2
     byte _sigx29
-    byte _fstype[8] 'xxx just one byte and store 0 or 1?
-    byte _twofats
+    byte _fstype[8] 'xxx just one byte and store 0 or 1?    'XXX not used
+    byte _twofats 'XXX not used
 
     byte _boot_code[BOOTCODE_LEN]
     byte _str_fatnm[FATNAME_LEN+1]
     byte _str_oem_nm[FATOEMNAME_LEN+1]
     byte _str_vol_nm[VOLNAME_LEN+1]
+
+    ' dir structure
+    long _file_nr
+    byte _str_fn[8+1]
+    byte _str_fext[3+1]
+    byte _file_attr
+    byte _time_cr_ms
+    word _time_cr
+    word _date_cr
+    word _date_lastxs
+    word _clust_file_h
+    word _time_lastwr
+    word _date_lastwr
+    word _clust_file_l
+    long _file_sz
 
 OBJ
 
@@ -137,20 +165,40 @@ PUB DeInit{}
     _ptr_fatimg := 0
 
 PUB SyncPart{}
-
+' Synchronize partition start offset with pointer in currently active
+'   sector buffer
     bytemove(@_part_st, _ptr_fatimg+PART1START, 4)
 
-PUB SyncFS{}
+PUB SyncFile(fnum)
+' Synchronize directory entry data for file number fnum within currently active
+'   sector buffer
+    fnum := _ptr_fatimg + (fnum * $20)          ' calc offset for particular file
+    bytefill(@_str_fn, 0, 9)                    ' clear string buffers
+    bytefill(@_str_fext, 0, 4)
 
-    'xxx create 1:1 structure in VAR the full size of the BDB? then a simple byte/word/longmove
-    ' of the whole thing
-    ' xxx maybe not - not every datum is by itself in a byte
+    bytemove(@_str_fn, fnum+FNAME, 8)
+    bytemove(@_str_fext, fnum+FNEXT, 3)
+    bytemove(@_file_attr, fnum+FATTR, 1)
+    bytemove(@_time_cr_ms, fnum+FCREATE_TMS, 1)
+    bytemove(@_time_cr, fnum+FCREATE_T, 2)
+    bytemove(@_date_cr, fnum+FCREATE_D, 2)
+    bytemove(@_date_lastxs, fnum+FLASTXS_D, 2)
+    bytemove(@_clust_file_h, fnum+FCLUST_H, 2)
+    bytemove(@_time_lastwr, fnum+FLASTWR_T, 2)
+    bytemove(@_date_lastwr, fnum+FLASTWR_D, 2)
+    bytemove(@_clust_file_l, fnum+FCLUST_L, 2)
+    bytemove(@_file_sz, fnum+FSZ, 4)
+
+PUB SyncBPB{}
+' Synchronize BIOS Parameter Block data with currently active sector buffer
     _fat_actv := (byte[_ptr_fatimg][FLAGS] >> ACTVFAT) & $7F
     bytemove(@_sect_bkupboot, _ptr_fatimg+BKUPBOOTSECT, 2)
     bytemove(@_boot_code, _ptr_fatimg+BOOTCODE, BOOTCODE_LEN)
     bytemove(@_str_fatnm, _ptr_fatimg+FATNAME, FATNAME_LEN)
     bytemove(@_fat_ver, _ptr_fatimg+FAT32VERS, 2)
-    bytemove(@_fat_flags, _ptr_fatimg+FLAGS, 2) ' does FATFlags() and FATMirroring()
+
+    ' updates FATFlags() and FATMirroring()
+    bytemove(@_fat_flags, _ptr_fatimg+FLAGS, 2)
     bytemove(@_sect_fsinfo, _ptr_fatimg+FSINFOSECT, 2)
     bytemove(@_sig_fsi1, _ptr_fatimg+FSINFOSIG1, 4)
     bytemove(@_sig_fsi2, _ptr_fatimg+FSINFOSIG2, 4)
@@ -221,6 +269,82 @@ PUB FATMirroring{}: state
 ' Flag indicating FAT mirroring is enabled
 '   Returns: boolean
     return ((_fat_flags >> FATMIRROR) & 1) == 0
+
+PUB FileAttrs{}: a
+' File attributes
+'   Returns: bitmap
+'       bit 5: is an archive
+'           4: is a subdirectory
+'           3: is the volume name
+'           2: is a system file
+'           1: is a hidden file
+'           0: is write-protected
+    return _file_attr & $3F
+
+PUB FileCluster{}: c
+' First cluster of file
+'   Returns: long
+    return (_clust_file_h << 8) | _clust_file_l
+
+PUB FileCreateMS{}: ms
+' Timestamp of file creation, in milliseconds
+'   Returns: byte
+    return _time_cr_ms
+
+PUB FileCreateDate{}: d
+' Date file was created
+'   Returns: bitmap
+'       bit 15..9: year from 1980 (e.g., 41 = 2021 (80+41-100=21))
+'       bit 8..5: month
+'       bit 4..0: day
+    return _date_cr
+
+PUB FileCreateTime{}: t
+' Time file was created
+'   Returns: bitmap
+'       bit 15..11: hours
+'       bit 10..5: minutes
+'       bit 4..0: 2 second intervals
+    return _time_cr
+
+PUB FileName{}: ptr_str
+' File name
+'   Returns: pointer to string
+    return @_str_fn
+
+PUB FileNameExt{}: ptr_str
+' File name extension
+'   Returns: pointer to string
+    return @_str_fext
+
+PUB FileSize{}: sz
+' File size, in bytes
+'   Returns: long
+    return _file_sz
+
+PUB FLastAccDate{}: d
+' Date file was last accessed
+'   Returns: bitmap
+'       bit 15..9: year from 1980
+'       bit 8..5: month
+'       bit 4..0: day
+    return _date_lastxs
+
+PUB FLastModDate{}: d
+' Date file was last modified
+'   Returns: bitmap
+'       bit 15..9: year from 1980
+'       bit 8..5: month
+'       bit 4..0: day
+    return _date_lastwr
+
+PUB FLastModTime{}: t
+' Time file was last modified
+'   Returns: bitmap
+'       bit 15..11: hours
+'       bit 10..5: minutes
+'       bit 4..0: 2 second intervals
+    return _time_lastwr
 
 PUB FInfoSector{}: s
 ' Filesystem info sector
