@@ -255,10 +255,15 @@ PUB BootCodePtr{}: ptr
 '   Returns: pointer to buffer containing boot code
     return @_boot_code
 
-PUB ClusterStart(clust_nr): sect
+PUB Clust2Sect(clust_nr): sect
 ' Starting sector of cluster number
 '   Returns: long
     return _data_regn + (_sect_per_clust * clust_nr)
+
+PUB FAT1Start{}: s
+' Starting sector of FAT1
+'   Returns: long
+    return _sect_fat1_st
 
 PUB FAT32Name{}: s
 ' FAT name (usually FAT32)
@@ -291,7 +296,7 @@ PUB FileAttrs{}: a
 '           0: is write-protected
     return _file_attr & $3F
 
-PUB FileCluster{}: c
+PUB FileFirstClust{}: c
 ' First cluster of file
 '   Returns: long
     return (_clust_file_h << 8) | _clust_file_l
@@ -441,6 +446,11 @@ PUB RootDirSector{}: s
 ' Starting sector of root directory entry
 '   Returns: long
     return _sect_rtdir_st
+
+PUB Sect2Clust(sect): clust
+' Map given sector number to a cluster number
+'   Returns: long
+    clust := ((sect - _data_regn) / _sect_per_clust)
 
 PUB SectorsPerCluster{}: spc
 ' Sectors per cluster
