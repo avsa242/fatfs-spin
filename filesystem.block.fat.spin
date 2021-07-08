@@ -260,6 +260,11 @@ PUB Clust2Sect(clust_nr): sect
 '   Returns: long
     return _data_regn + (_sect_per_clust * clust_nr)
 
+PUB DirEntNeverUsed{}: bool
+' Flag indicating directory never used
+'   Returns: boolean
+    return _str_fn[0] == $00
+
 PUB FAT1Start{}: s
 ' Starting sector of FAT1
 '   Returns: long
@@ -322,6 +327,11 @@ PUB FileCreateTime{}: t
 '       bit 4..0: 2 second intervals
     return _time_cr
 
+PUB FileIsDeleted{}: d
+' Flag indicating file is deleted
+'   Returns: boolean
+    return _str_fn[0] == $E5              ' FN first char is xE5?
+
 PUB FileName{}: ptr_str
 ' File name
 '   Returns: pointer to string
@@ -336,6 +346,13 @@ PUB FileSize{}: sz
 ' File size, in bytes
 '   Returns: long
     return _file_sz
+
+PUB FileTotalClust{}: c
+' Total number of clusters occupied by file
+'   Returns: long
+'   NOTE: This value is inferred from known file size, bytes per sector,
+'       and sectors per cluster
+    return 1 #> (_file_sz / (_sect_sz * _sect_per_clust))
 
 PUB FLastAccDate{}: d
 ' Date file was last accessed
