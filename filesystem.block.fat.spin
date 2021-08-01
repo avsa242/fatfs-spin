@@ -85,6 +85,8 @@ CON
     FHIDNFIL        = 1 << 1
     FWRPROT         = 1
 
+    MRKR_EOC        = $0FFF_FFFF
+
 VAR
 
     long _ptr_fatimg
@@ -153,6 +155,12 @@ VAR
     word _clust_file_l
     long _file_sz
 
+    ' current file
+    '   is open
+    '   current seek position
+    '   bytes remaining from seek to end
+    long _next_clust, _prev_clust
+
 OBJ
 
     math    : "math.int"
@@ -165,6 +173,7 @@ PUB Init(ptr_fatimg, sector_sz)
 '   ptr_fatimg: pointer to FAT sector buffer
 '   sector_sz: data bytes per sector
     _ptr_fatimg := ptr_fatimg
+    _sect_sz := sector_sz
 
 PUB DeInit{}
 
@@ -175,27 +184,7 @@ PUB SyncPart{}
 '   sector buffer
     bytemove(@_part_st, _ptr_fatimg+PART1START, 4)
 
-PUB SyncFile(fnum)
-' Synchronize directory entry data for file number fnum with currently active
-'   sector buffer
-    fnum := _ptr_fatimg + (fnum * DIRENT_SZ)    ' calc offset for this file
-    bytefill(@_str_fn, 0, 9)                    ' clear string buffers
-    bytefill(@_str_fext, 0, 4)
-
-    bytemove(@_str_fn, fnum+FNAME, 8)
-    bytemove(@_str_fext, fnum+FNEXT, 3)
-    bytemove(@_file_attr, fnum+FATTR, 1)
-    bytemove(@_time_cr_ms, fnum+FCREATE_TMS, 1)
-    bytemove(@_time_cr, fnum+FCREATE_T, 2)
-    bytemove(@_date_cr, fnum+FCREATE_D, 2)
-    bytemove(@_date_lastxs, fnum+FLASTXS_D, 2)
-    bytemove(@_clust_file_h, fnum+FCLUST_H, 2)
-    bytemove(@_time_lastwr, fnum+FLASTWR_T, 2)
-    bytemove(@_date_lastwr, fnum+FLASTWR_D, 2)
-    bytemove(@_clust_file_l, fnum+FCLUST_L, 2)
-    bytemove(@_file_sz, fnum+FSZ, 4)
-
-PUB SyncBPB{}
+PUB SyncBPB{}   ' xxx validate signatures before syncing?
 ' Synchronize BIOS Parameter Block data with currently active sector buffer
     _fat_actv := (byte[_ptr_fatimg][FLAGS] >> ACTVFAT) & $7F
     bytemove(@_sect_bkupboot, _ptr_fatimg+BKUPBOOTSECT, 2)
@@ -252,13 +241,23 @@ PUB BackupBootSect{}: s
 
 PUB BootCodePtr{}: ptr
 ' Boot code
-'   Returns: pointer to buffer containing boot code
+'   Returns: pointer to buffer containing boot code 'XXX indicate how many bytes it is
     return @_boot_code
+
+PUB BytesPerClust{}: b
+' Number of bytes per cluster:
+'   Returns: long
+    return _sect_per_clust * _sect_sz
 
 PUB Clust2Sect(clust_nr): sect
 ' Starting sector of cluster number
 '   Returns: long
     return _data_regn + (_sect_per_clust * clust_nr)
+
+PUB ClustLastSect{}: sect
+' Last sector of cluster
+'   Returns: long
+    return (clust2sect(_next_clust) + _sect_per_clust)-1
 
 PUB DirEntNeverUsed{}: bool
 ' Flag indicating directory never used
@@ -280,6 +279,10 @@ PUB FAT32Version{}: v
 '   Returns word [major..minor]
     return _fat_ver
 
+PUB FATEnt2Clust(fat_chn): cl
+' Get cluster number pointed to by FAT entry/chain
+    bytemove(@cl, _ptr_fatimg+(fat_chn * 4), 4)
+
 PUB FATFlags{}: f
 ' Flags
 '   Returns: word
@@ -289,6 +292,22 @@ PUB FATMirroring{}: state
 ' Flag indicating FAT mirroring is enabled
 '   Returns: boolean
     return ((_fat_flags >> FATMIRROR) & 1) == 0
+
+PUB FClose{}
+' Close currently open file
+    bytefill(@_str_fn, 0, 9)
+    bytefill(@_str_fext, 0, 4)
+    bytefill(@_file_attr, 0, 1)
+    bytefill(@_time_cr_ms, 0, 1)
+    wordfill(@_time_cr, 0, 1)
+    wordfill(@_date_cr, 0, 1)
+    wordfill(@_date_lastxs, 0, 1)
+    wordfill(@_clust_file_h, 0, 1)
+    wordfill(@_time_lastwr, 0, 1)
+    wordfill(@_date_lastwr, 0, 1)
+    wordfill(@_clust_file_l, 0, 1)
+    longfill(@_file_sz, 0, 1)
+    'xxx _prev_clust, _next_clust
 
 PUB FileAttrs{}: a
 ' File attributes
@@ -301,10 +320,15 @@ PUB FileAttrs{}: a
 '           0: is write-protected
     return _file_attr & $3F
 
-PUB FileFirstClust{}: c
+PUB FileFirstClust{}: c ' xxx which is faster, the below, or c.word[1] :=, c.word[0] := ... ?
 ' First cluster of file
 '   Returns: long
-    return (_clust_file_h << 8) | _clust_file_l
+    return (_clust_file_h << 16) | _clust_file_l
+
+PUB FileFirstSect{}: s
+' First sector of file
+'   Returns: long
+    return clust2sect(filefirstclust{})
 
 PUB FileCreateMS{}: ms
 ' Timestamp of file creation, in milliseconds
@@ -342,6 +366,14 @@ PUB FileNameExt{}: ptr_str
 '   Returns: pointer to string
     return @_str_fext
 
+PUB FileNextClust{}: c
+
+    return _next_clust
+
+PUB FilePrevClust{}: c
+
+    return _prev_clust
+
 PUB FileSize{}: sz
 ' File size, in bytes
 '   Returns: long
@@ -353,6 +385,12 @@ PUB FileTotalClust{}: c
 '   NOTE: This value is inferred from known file size, bytes per sector,
 '       and sectors per cluster
     return 1 #> (_file_sz / (_sect_sz * _sect_per_clust))
+
+PUB FileTotalSect{}: s
+' Total number of sectors occupied by file
+'   Returns: long
+'   NOTE: This value is inferred from known file size and bytes per sector
+    return filesize{} / _sect_sz
 
 PUB FLastAccDate{}: d
 ' Date file was last accessed
@@ -396,6 +434,31 @@ PUB FISSigValidMask{}: m
     if _sig_fsi3 == FSISIG3
         m |= %100
 
+PUB FOpen(fnum)
+' Open file
+'   NOTE: No validation is performed on data in sector buffer
+    fnum := _ptr_fatimg + (fnum * DIRENT_SZ)    ' calc offset for this file
+    bytefill(@_str_fn, 0, 9)                    ' clear string buffers
+    bytefill(@_str_fext, 0, 4)
+
+    bytemove(@_str_fn, fnum+FNAME, 8)
+    bytemove(@_str_fext, fnum+FNEXT, 3)
+    bytemove(@_file_attr, fnum+FATTR, 1)
+    bytemove(@_time_cr_ms, fnum+FCREATE_TMS, 1)
+    bytemove(@_time_cr, fnum+FCREATE_T, 2)
+    bytemove(@_date_cr, fnum+FCREATE_D, 2)
+    bytemove(@_date_lastxs, fnum+FLASTXS_D, 2)
+    bytemove(@_clust_file_h, fnum+FCLUST_H, 2)
+    bytemove(@_time_lastwr, fnum+FLASTWR_T, 2)
+    bytemove(@_date_lastwr, fnum+FLASTWR_D, 2)
+    bytemove(@_clust_file_l, fnum+FCLUST_L, 2)
+    bytemove(@_file_sz, fnum+FSZ, 4)
+
+    ' when opening the file, initialize next and prev cluster numbers with
+    '   the file's first cluster number
+    _next_clust := (_clust_file_h << 16) | (_clust_file_l)
+    _prev_clust := _next_clust
+
 PUB Heads{}: h
 ' Number of heads
 '   Returns: word
@@ -425,6 +488,18 @@ PUB LogicalSectorBytes{}: b
 PUB MediaType{}: t
 ' Media type of FAT
     return _fat_medtyp
+
+PUB NextCluster{}: c
+' Get next cluster number in chain
+'   Returns: long
+    c := 0
+    ' update the next and prev cluster pointers, by following the chain
+    '   read from the FAT
+    _next_clust := fatent2clust(_prev_clust & $7f)
+    _prev_clust := _next_clust
+    if _next_clust == MRKR_EOC                  ' End-of-Chain marker reached
+        return -1                               '   no more clusters
+    return _next_clust
 
 PUB NumberFATs{}: n
 ' Number of copies of FAT
