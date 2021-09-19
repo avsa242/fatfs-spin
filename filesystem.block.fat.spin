@@ -12,28 +12,16 @@
 
 CON
 
-    BYTESPERSECT    = 512
+' FAT32 structure on disk
 
-' offsets within FS
-    MBR             = 0
-    BOOTSZ          = 446
-    PART1ENT        = $1BE
-    PART1STATE      = PART1ENT + $00
-    PART1STARTCHS   = PART1ENT + $01            ' 3 bytes
-    PART1TYPE       = PART1ENT + $04
-    PART1ENDCHS     = PART1ENT + $05
-    PART1START      = PART1ENT + $08            ' LE long at this location
-    PART1TOTALSECT  = PART1ENT + $0C
-
-    PART2ENT        = $1CE
-    PART3ENT        = $1DE
-    PART4ENT        = $1EE
-
+    ' offsets within FS
+    BOOT_LEN        = 446
+    MBR             = 0                         ' these two refer to the same
     BOOTRECORD      = 0
-    JMPBOOT         = BOOTRECORD+$00            ' 3
+    JMPBOOT         = BOOTRECORD+$00            ' 3 bytes
     FATOEMNAME      = BOOTRECORD+$03            ' 8
     FATOEMNAME_LEN  = 8                         ' text + NUL
-    BYTESPERLOGISECT= BOOTRECORD+$0B            ' 2
+    BYTESPERLSECT   = BOOTRECORD+$0B            ' 2
     SECPERCLUST     = BOOTRECORD+$0D            ' 1
     RSVDSECTS       = BOOTRECORD+$0E            ' 2
     FATCOPIES       = BOOTRECORD+$10            ' 1
@@ -44,8 +32,8 @@ CON
     SECTPERPART     = BOOTRECORD+$20            ' 4
     SECTPERFAT      = BOOTRECORD+$24            ' 4
     FLAGS           = BOOTRECORD+$28            ' 2
-        FATMIRROR   = 15
-        ACTVFAT     = 8                         ' LOWER 7 BITS
+    FATMIRROR       = 15
+    ACTVFAT         = 8                         ' LOWER 7 BITS
     FAT32VERS       = BOOTRECORD+$2A            ' 2
     ROOTDIRCLUST    = BOOTRECORD+$2C            ' 4
     FSINFOSECT      = BOOTRECORD+$30            ' 2
@@ -59,22 +47,38 @@ CON
     FATNAME_LEN     = 8
     BOOTCODE        = BOOTRECORD+$5A            ' 420 BYTES
     BOOTCODE_LEN    = 420
+
+    PARTENT_LEN     = 16
+    PART1ENT        = $1BE
+    PART2ENT        = $1CE
+    PART3ENT        = $1DE
+    PART4ENT        = $1EE
+    PART_STATE      = $00
+    PART_STARTCHS   = $01                       ' 3 bytes
+    PART_TYPE       = $04
+    PART_ENDCHS     = $05
+    PART_START      = $08                       ' LE long at this location
+    PART_TOTALSECT  = $0C
+
     MBRSIG          = $1FE
     SIG             = $AA55
 
+    ' partition boot record
+
+    FSTYPE_FAT16    = $36                       ' "FAT16"
+    FSTYPE_FAT32    = $52                       ' "FAT32"
+
+    ' FS information sector
     FSINFOSIG1      = $000
-    FSISIG1         = $41615252                 ' RRaA
+    FSISIG1         = $41_61_52_52              ' RRaA
     FSINFOSIG2      = $1E4
-    FSISIG2         = $61417272                 ' rrAa
+    FSISIG2         = $61_41_72_72              ' rrAa
     LSTKNWNFRCLUST  = $1E8
     LSTALLOCCLUST   = $1EC
     FSINFOSIG3      = $1FC
     FSISIG3         = $AA550000
 
-    FSTYPE_FAT16    = $36                       ' "FAT16"
-    FSTYPE_FAT32    = $52                       ' "FAT32"
-
-    MRKR_EOC        = $0FFF_FFFF
+    MRKR_EOC        = $0FFF_FFFF                ' end of chain (last cluster)
 
 VAR
 
@@ -107,11 +111,11 @@ VAR
     word _nr_heads
     word _rsvd
     word _sect_bkupboot
-    word _sect_bytes
+    word _sect_sz
     word _sect_fsinfo
     word _sect_rsvd
 
-    word _sect_sz 'xxx some method to compare this to requested sect size on Init()?
+'    word _sect_sz 'xxx some method to compare this to requested sect size on Init()?
     word _sect_per_part
     word _sect_per_trk
     word _sigxaa55
@@ -132,7 +136,7 @@ VAR
 CON
 ' Directory entry ("dirent")
     ' offsets within root dir sector
-    DIRENT_SZ       = 32
+    DIRENT_LEN      = 32
     FNAME           = $00                       ' filename
     FNEXT           = $08                       ' filename extension
     FATTR           = $0B                       ' file attributes
@@ -184,12 +188,10 @@ OBJ
 PUB Null{}
 ' This is not a top-level object
 
-PUB Init(ptr_fatimg, sector_sz)
+PUB Init(ptr_fatimg)
 ' Initialize
 '   ptr_fatimg: pointer to FAT sector buffer
-'   sector_sz: data bytes per sector
     _ptr_fatimg := ptr_fatimg
-    _sect_sz := sector_sz
 
 PUB DeInit{}
 
@@ -197,8 +199,8 @@ PUB DeInit{}
 
 PUB SyncPart{}
 ' Synchronize partition start offset with pointer in currently active
-'   sector buffer
-    bytemove(@_part_st, _ptr_fatimg+PART1START, 4)
+'   sector buffer (currently hardcoded for partition #1)
+    bytemove(@_part_st, _ptr_fatimg+PART1ENT+PART_START, 4)
 
 PUB SyncBPB{}   ' xxx validate signatures before syncing?
 ' Synchronize BIOS Parameter Block data with currently active sector buffer
@@ -217,7 +219,7 @@ PUB SyncBPB{}   ' xxx validate signatures before syncing?
     bytemove(@_nr_heads, _ptr_fatimg+NRHEADS, 2)
     bytemove(@_sect_hidn, _ptr_fatimg+NRHIDDENSECT, 4)
     _drv_num := byte[_ptr_fatimg][PARTLOGICLDN]
-    bytemove(@_sect_bytes, _ptr_fatimg+BYTESPERLOGISECT, 2)
+    bytemove(@_sect_sz, _ptr_fatimg+BYTESPERLSECT, 2)
     _fat_medtyp := byte[_ptr_fatimg][MEDIADESC]
     _nr_fats := byte[_ptr_fatimg][FATCOPIES]
     bytefill(@_str_oem_nm, 0, FATOEMNAME_LEN+1)
@@ -241,7 +243,7 @@ PUB SyncBPB{}   ' xxx validate signatures before syncing?
     _root_ents := 16 << _clust_shf 'xxx where's 16 come from?
     _data_region := (_sect_fat1_st + 2 * _sect_per_fat) - 2 * _sect_per_clust
     _rootdir := (_data_region << _clust_rtdir_st << _clust_shf) << math.log2(_sect_sz)
-    _rootdirend := _rootdir + (_root_ents << math.log2(DIRENT_SZ))
+    _rootdirend := _rootdir + (_root_ents << math.log2(DIRENT_LEN))
     _clust_total := ((_sect_per_part - _data_region + _part_st) >> _clust_shf)
     _sect_rtdir_st := _sect_fat1_st + (_nr_fats * _sect_per_fat)
 
@@ -264,6 +266,11 @@ PUB BytesPerClust{}: b
 ' Number of bytes per cluster:
 '   Returns: long
     return _sect_per_clust * _sect_sz
+
+PUB BytesPerSect{}: b
+' Number of bytes per sector
+'   Returns: word
+    return _sect_sz
 
 PUB Clust2Sect(clust_nr): sect
 ' Starting sector of cluster number
@@ -475,7 +482,7 @@ PUB FISSigValidMask{}: m
 PUB FOpen(fnum)
 ' Open file
 '   NOTE: No validation is performed on data in sector buffer
-    fnum := _ptr_fatimg + (fnum * DIRENT_SZ)    ' calc offset for this file
+    fnum := _ptr_fatimg + (fnum * DIRENT_LEN)   ' calc offset for this file
     bytefill(@_str_fn, 0, 9)                    ' clear string buffers
     bytefill(@_str_fext, 0, 4)
 
@@ -521,7 +528,7 @@ PUB LogicalSectorBytes{}: b
 ' Size of logical sector, in bytes
 '   Returns: word
 '   NOTE: Values returned should be powers of 2 only
-    return _sect_bytes
+    return _sect_sz
 
 PUB MediaType{}: t
 ' Media type of FAT
