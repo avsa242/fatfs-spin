@@ -367,6 +367,10 @@ PUB FileCreateTime{}: t
 '       bit 4..0: 2 second intervals
     return _time_cr
 
+PUB FileEnd{}: p
+' Last byte number of file
+    return (_file_sz - 1)
+
 PUB FileIsDeleted{}: d
 ' Flag indicating file is deleted
 '   Returns: boolean
