@@ -13,7 +13,6 @@
 CON
 
     BYTESPERSECT    = 512
-    DIRENT_SZ       = 32
 
 ' offsets within FS
     MBR             = 0
@@ -133,6 +132,7 @@ VAR
 CON
 ' Directory entry ("dirent")
     ' offsets within root dir sector
+    DIRENT_SZ       = 32
     FNAME           = $00                       ' filename
     FNEXT           = $08                       ' filename extension
     FATTR           = $0B                       ' file attributes
