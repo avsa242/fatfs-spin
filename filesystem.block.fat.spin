@@ -436,6 +436,20 @@ PUB FLastModTime{}: t
 '       bit 4..0: 2 second intervals
     return _time_lastwr
 
+PUB FModDate(date_word)
+' Update file modified datestamp
+'       bit 15..9: year from 1980
+'       bit 8..5: month
+'       bit 4..0: day
+    _date_lastwr := date_word
+
+PUB FModTime(time_word)
+' Update file modified timestamp
+'       bit 15..11: hours
+'       bit 10..5: minutes
+'       bit 4..0: 2 second intervals
+    _time_lastwr := time_word
+
 PUB FInfoSector{}: s
 ' Filesystem info sector
 '   Returns: word
