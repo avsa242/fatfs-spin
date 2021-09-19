@@ -395,6 +395,10 @@ PUB FileSize{}: sz
 '   Returns: long
     return _file_sz
 
+PUB FSizeUpdate(new_sz)
+' Update file size
+    _file_sz := new_sz
+
 PUB FileTotalClust{}: c
 ' Total number of clusters occupied by file
 '   Returns: long
