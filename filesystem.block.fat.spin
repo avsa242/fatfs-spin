@@ -5,7 +5,7 @@
     Description: FAT filesystem engine
     Copyright (c) 2021
     Started Aug 1, 2021
-    Updated Aug 1, 2021
+    Updated Sep 19, 2021
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -67,35 +67,13 @@ CON
     FSISIG1         = $41615252                 ' RRaA
     FSINFOSIG2      = $1E4
     FSISIG2         = $61417272                 ' rrAa
-    LASTKNWNFRCLST  = $1E8
-    LASTALLOCCLST   = $1EC
+    LSTKNWNFRCLUST  = $1E8
+    LSTALLOCCLUST   = $1EC
     FSINFOSIG3      = $1FC
     FSISIG3         = $AA550000
 
     FSTYPE_FAT16    = $36                       ' "FAT16"
     FSTYPE_FAT32    = $52                       ' "FAT32"
-
-    ' directory
-    FNAME           = $00
-    FNEXT           = $08
-    FATTR           = $0B
-    FCREATE_TMS     = $0D
-    FCREATE_T       = $0E
-    FCREATE_D       = $10
-    FLASTXS_D       = $12
-    FCLUST_H        = $14
-    FLASTWR_T       = $16
-    FLASTWR_D       = $18
-    FCLUST_L        = $1A
-    FSZ             = $1C
-
-    ' file attributes
-    FARC            = 1 << 5
-    FSUBDIR         = 1 << 4
-    FVOL_NM         = 1 << 3
-    FSYSFIL         = 1 << 2
-    FHIDNFIL        = 1 << 1
-    FWRPROT         = 1
 
     MRKR_EOC        = $0FFF_FFFF
 
@@ -109,7 +87,7 @@ VAR
     long _clust_rtdir_st
     long _clust_sz
 
-    long _data_regn
+    long _data_region
     long _endofchain
     long _sect_fat1_st
     long _part_sn
@@ -152,20 +130,46 @@ VAR
     byte _str_oem_nm[FATOEMNAME_LEN+1]
     byte _str_vol_nm[VOLNAME_LEN+1]
 
-    ' dir structure
-    long _file_nr
-    byte _str_fn[8+1]
-    byte _str_fext[3+1]
-    byte _file_attr
-    byte _time_cr_ms
-    word _time_cr
-    word _date_cr
-    word _date_lastxs
-    word _clust_file_h
-    word _time_lastwr
-    word _date_lastwr
-    word _clust_file_l
-    long _file_sz
+CON
+' Directory entry ("dirent")
+    ' offsets within root dir sector
+    FNAME           = $00                       ' filename
+    FNEXT           = $08                       ' filename extension
+    FATTR           = $0B                       ' file attributes
+    FCREATE_TMS     = $0D                       ' creation timestamp (ms)
+    FCREATE_T       = $0E                       ' creation timestamp
+    FCREATE_D       = $10                       ' creation datestamp
+    FLSTXS_D        = $12                       ' last accessed datestamp
+    FCLUST_H        = $14                       ' first cluster (MSW, FAT32)
+    FLSTWR_T        = $16                       ' last written timestamp
+    FLSTWR_D        = $18                       ' last written datestamp
+    FCLUST_L        = $1A                       ' first cluster (LSW)
+    FSZ             = $1C                       ' size
+
+    ' file attributes
+    FARC            = 1 << 5                    ' is an archive
+    FSUBDIR         = 1 << 4                    ' is a sub-directory
+    FVOL_NM         = 1 << 3                    ' is the volume name
+    FSYSFIL         = 1 << 2                    ' is a system file
+    FHIDNFIL        = 1 << 1                    ' is hidden
+    FWRPROT         = 1                         ' is write-protected
+    FDEL_MARKER     = $E5                       ' FN first char, if deleted
+
+VAR
+' Directory entry
+    long _file_nr                               ' file number within root dir
+    byte _str_fn[8+1]                           ' filename string
+    byte _str_fext[3+1]                         ' filename extension string
+    byte _file_attr                             ' file attributes
+    byte _time_cr_ms                            ' creation time, milliseconds
+    word _time_cr                               ' creation time
+    word _date_cr                               ' creation date
+    word _date_lastxs                           ' last access date
+    word _clust_file_h                          ' first cluster # (MSW, FAT32)
+    word _time_lastwr                           ' last written time
+    word _date_lastwr                           ' last written date
+    word _clust_file_l                          ' last cluster # (LSW)
+    long _file_sz                               ' file size
 
     ' current file
     '   is open
@@ -235,10 +239,10 @@ PUB SyncBPB{}   ' xxx validate signatures before syncing?
     _clust_shf := math.log2(_sect_per_clust)
 
     _root_ents := 16 << _clust_shf 'xxx where's 16 come from?
-    _data_regn := (_sect_fat1_st + 2 * _sect_per_fat) - 2 * _sect_per_clust
-    _rootdir := (_data_regn << _clust_rtdir_st << _clust_shf) << math.log2(_sect_sz)
+    _data_region := (_sect_fat1_st + 2 * _sect_per_fat) - 2 * _sect_per_clust
+    _rootdir := (_data_region << _clust_rtdir_st << _clust_shf) << math.log2(_sect_sz)
     _rootdirend := _rootdir + (_root_ents << math.log2(DIRENT_SZ))
-    _clust_total := ((_sect_per_part - _data_regn + _part_st) >> _clust_shf)
+    _clust_total := ((_sect_per_part - _data_region + _part_st) >> _clust_shf)
     _sect_rtdir_st := _sect_fat1_st + (_nr_fats * _sect_per_fat)
 
 PUB ActiveFAT{}: fat_nr
@@ -264,7 +268,7 @@ PUB BytesPerClust{}: b
 PUB Clust2Sect(clust_nr): sect
 ' Starting sector of cluster number
 '   Returns: long
-    return _data_regn + (_sect_per_clust * clust_nr)
+    return _data_region + (_sect_per_clust * clust_nr)
 
 PUB ClustLastSect{}: sect
 ' Last sector of cluster
@@ -366,7 +370,7 @@ PUB FileCreateTime{}: t
 PUB FileIsDeleted{}: d
 ' Flag indicating file is deleted
 '   Returns: boolean
-    return _str_fn[0] == $E5              ' FN first char is xE5?
+    return _str_fn[0] == FDEL_MARKER            ' FN first char is xE5?
 
 PUB FileName{}: ptr_str
 ' File name
@@ -379,11 +383,11 @@ PUB FileNameExt{}: ptr_str
     return @_str_fext
 
 PUB FileNextClust{}: c
-
+' Next cluster used by file
     return _next_clust
 
 PUB FilePrevClust{}: c
-
+' Previous cluster used by file
     return _prev_clust
 
 PUB FileSize{}: sz
@@ -459,10 +463,10 @@ PUB FOpen(fnum)
     bytemove(@_time_cr_ms, fnum+FCREATE_TMS, 1)
     bytemove(@_time_cr, fnum+FCREATE_T, 2)
     bytemove(@_date_cr, fnum+FCREATE_D, 2)
-    bytemove(@_date_lastxs, fnum+FLASTXS_D, 2)
+    bytemove(@_date_lastxs, fnum+FLSTXS_D, 2)
     bytemove(@_clust_file_h, fnum+FCLUST_H, 2)
-    bytemove(@_time_lastwr, fnum+FLASTWR_T, 2)
-    bytemove(@_date_lastwr, fnum+FLASTWR_D, 2)
+    bytemove(@_time_lastwr, fnum+FLSTWR_T, 2)
+    bytemove(@_date_lastwr, fnum+FLSTWR_D, 2)
     bytemove(@_clust_file_l, fnum+FCLUST_L, 2)
     bytemove(@_file_sz, fnum+FSZ, 4)
 
@@ -554,7 +558,7 @@ PUB RootDirSector{}: s
 PUB Sect2Clust(sect): clust
 ' Map given sector number to a cluster number
 '   Returns: long
-    clust := ((sect - _data_regn) / _sect_per_clust)
+    clust := ((sect - _data_region) / _sect_per_clust)
 
 PUB SectorsPerCluster{}: spc
 ' Sectors per cluster
