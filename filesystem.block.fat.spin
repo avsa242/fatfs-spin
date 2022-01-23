@@ -3,9 +3,9 @@
     Filename: filesystem.block.fat.spin
     Author: Jesse Burt
     Description: FAT filesystem engine
-    Copyright (c) 2021
+    Copyright (c) 2022
     Started Aug 1, 2021
-    Updated Sep 19, 2021
+    Updated Jan 23, 2022
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -59,6 +59,12 @@ CON
     PART_ENDCHS     = $05
     PART_START      = $08                       ' LE long at this location
     PART_TOTALSECT  = $0C
+    P1_STATE        = PART1ENT+PART_STATE
+    P1_STARTCHS     = PART1ENT+PART_STARTCHS
+    P1_TYPE         = PART1ENT+PART_TYPE
+    P1_ENDCHS       = PART1ENT+PART_ENDCHS
+    P1_START        = PART1ENT+PART_START
+    P1_TOTALSECT    = PART1ENT+PART_TOTALSECT
 
     MBRSIG          = $1FE
     SIG             = $AA55
