@@ -522,9 +522,8 @@ PUB FOpen(fnum)
 
     ' when opening the file, initialize next and prev cluster numbers with
     '   the file's first cluster number
-    _prev_clust := _next_clust  'xxx this should be moved before the above line?
     _next_clust := (_clust_file_h << 16) | (_clust_file_l)
-'    _prev_clust := _next_clust  'xxx this should be moved before the above line?
+    _prev_clust := _next_clust
 
 PUB Heads{}: h
 ' Number of heads
