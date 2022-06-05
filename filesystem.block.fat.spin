@@ -5,7 +5,7 @@
     Description: FAT filesystem engine
     Copyright (c) 2022
     Started Aug 1, 2021
-    Updated Jan 23, 2022
+    Updated Jun 5, 2022
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -345,7 +345,7 @@ PUB FClose{}
     wordfill(@_date_lastwr, 0, 1)
     wordfill(@_clust_file_l, 0, 1)
     longfill(@_file_sz, 0, 1)
-    'xxx _prev_clust, _next_clust
+    longfill(@_next_clust, 0, 2)
 
 PUB FileAttrs{}: a
 ' File attributes
