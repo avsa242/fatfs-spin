@@ -167,6 +167,7 @@ CON
 
 VAR
 ' Directory entry
+    'xxx byte array? cache currently open file's dirent, then can write a modified one back to disk
     long _file_nr                               ' file number within root dir
     byte _str_fn[8+1]                           ' filename string
     byte _str_fext[3+1]                         ' filename extension string
@@ -247,6 +248,7 @@ PUB SyncBPB{}   ' xxx validate signatures before syncing?
     _clust_shf := math.log2(_sect_per_clust)
 
     _root_ents := 16 << _clust_shf 'xxx where's 16 come from?
+    { block data starts at }
     _data_region := (_sect_fat1_st + 2 * _sect_per_fat) - 2 * _sect_per_clust
     _rootdir := (_data_region << _clust_rtdir_st << _clust_shf) << math.log2(_sect_sz)
     _rootdirend := _rootdir + (_root_ents << math.log2(DIRENT_LEN))
@@ -281,6 +283,8 @@ PUB BytesPerSect{}: b
 PUB Clust2Sect(clust_nr): sect
 ' Starting sector of cluster number
 '   Returns: long
+    { convert cluster number to sector number, then offset by where the volume's data
+        starts }
     return _data_region + (_sect_per_clust * clust_nr)
 
 PUB ClustLastSect{}: sect
@@ -288,10 +292,15 @@ PUB ClustLastSect{}: sect
 '   Returns: long
     return (clust2sect(_next_clust) + _sect_per_clust)-1
 
+PUB DataStart{}: sect
+
+    return _data_region
+
 PUB DirEntNeverUsed{}: bool
-' Flag indicating directory never used
+' Flag indicating directory entry never used
 '   Returns: boolean
-    return _str_fn[0] == $00
+    { first character of filename is NUL? Directory entry was never used }
+    return (_str_fn[0] == $00)
 
 PUB FAT1Start{}: s
 ' Starting sector of FAT1
@@ -399,6 +408,11 @@ PUB FileNameExt{}: ptr_str
 '   Returns: pointer to string
     return @_str_fext
 
+PUB FileNum{}: f_no
+' File number within directory
+'   Returns: integer
+    return _file_nr
+
 PUB FileNextClust{}: c
 ' Next cluster used by file
     return _next_clust
@@ -488,6 +502,7 @@ PUB FISSigValidMask{}: m
 PUB FOpen(fnum)
 ' Open file
 '   NOTE: No validation is performed on data in sector buffer
+    _file_nr := fnum
     fnum := _ptr_fatimg + (fnum * DIRENT_LEN)   ' calc offset for this file
     bytefill(@_str_fn, 0, 9)                    ' clear string buffers
     bytefill(@_str_fext, 0, 4)
@@ -507,8 +522,9 @@ PUB FOpen(fnum)
 
     ' when opening the file, initialize next and prev cluster numbers with
     '   the file's first cluster number
+    _prev_clust := _next_clust  'xxx this should be moved before the above line?
     _next_clust := (_clust_file_h << 16) | (_clust_file_l)
-    _prev_clust := _next_clust
+'    _prev_clust := _next_clust  'xxx this should be moved before the above line?
 
 PUB Heads{}: h
 ' Number of heads
@@ -596,7 +612,7 @@ PUB Sect2Clust(sect): clust
     clust := ((sect - _data_region) / _sect_per_clust)
 
 PUB SectorsPerCluster{}: spc
-' Sectors per cluster
+' Sectors per cluster (usually 32)
 '   Returns: byte
 '   NOTE: Values returned should be powers of 2 only
     return _sect_per_clust
