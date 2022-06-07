@@ -12,40 +12,40 @@
 
 CON
 
-' FAT32 structure on disk
+{ FAT32 structure on disk }
 
-    ' offsets within FS
+    { offsets within FS }
     BOOT_LEN        = 446
     MBR             = 0                         ' these two refer to the same
-    BOOTRECORD      = 0
-    JMPBOOT         = BOOTRECORD+$00            ' 3 bytes
-    FATOEMNM        = BOOTRECORD+$03            ' 8
+    BOOTREC         = 0
+    JMPBOOT         = BOOTREC+$00               ' 3 bytes
+    FATOEMNM        = BOOTREC+$03               ' 8
     FATOEMNM_LEN    = 8                         ' text + NUL
-    BYTESPERLSECT   = BOOTRECORD+$0B            ' 2
-    SECPERCLUST     = BOOTRECORD+$0D            ' 1
-    RSVDSECTS       = BOOTRECORD+$0E            ' 2
-    FATCOPIES       = BOOTRECORD+$10            ' 1
-    MEDIADESC       = BOOTRECORD+$15            ' 1
-    SECTPERTRK      = BOOTRECORD+$18            ' 2
-    NRHEADS         = BOOTRECORD+$1A            ' 2
-    NRHIDDENSECT    = BOOTRECORD+$1C            ' 4
-    SECTPERPART     = BOOTRECORD+$20            ' 4
-    SECTPERFAT      = BOOTRECORD+$24            ' 4
-    FLAGS           = BOOTRECORD+$28            ' 2
+    BYTESPERLSECT   = BOOTREC+$0B               ' 2
+    SECPERCLUST     = BOOTREC+$0D               ' 1
+    RSVDSECTS       = BOOTREC+$0E               ' 2
+    FATCOPIES       = BOOTREC+$10               ' 1
+    MEDIADESC       = BOOTREC+$15               ' 1
+    SECTPERTRK      = BOOTREC+$18               ' 2
+    NRHEADS         = BOOTREC+$1A               ' 2
+    NRHIDDENSECT    = BOOTREC+$1C               ' 4
+    SECTPERPART     = BOOTREC+$20               ' 4
+    SECTPERFAT      = BOOTREC+$24               ' 4
+    FLAGS           = BOOTREC+$28               ' 2
     FATMIRROR       = 15
     ACTVFAT         = 8                         ' LOWER 7 BITS
-    FAT32VERS       = BOOTRECORD+$2A            ' 2
-    RTDIRCLUST      = BOOTRECORD+$2C            ' 4
-    FS_INFOSECT     = BOOTRECORD+$30            ' 2
-    BKUPBOOTSECT    = BOOTRECORD+$32            ' 2
-    PARTLOGICLDN    = BOOTRECORD+$40            ' 1
-    SIGX29          = BOOTRECORD+$42            ' 1
-    PART_SN         = BOOTRECORD+$43            ' LE LONG
-    VOLNM           = BOOTRECORD+$47            ' 11 BYTES
+    FAT32VERS       = BOOTREC+$2A               ' 2
+    RTDIRCLUST      = BOOTREC+$2C               ' 4
+    FS_INFOSECT     = BOOTREC+$30               ' 2
+    BKUPBOOTSECT    = BOOTREC+$32               ' 2
+    PARTLOGICLDN    = BOOTREC+$40               ' 1
+    SIGX29          = BOOTREC+$42               ' 1
+    PART_SN         = BOOTREC+$43               ' LE LONG
+    VOLNM           = BOOTREC+$47               ' 11 BYTES
     VOLNM_LEN       = 11
-    FATNM           = BOOTRECORD+$52            ' 8 BYTES
+    FATNM           = BOOTREC+$52               ' 8 BYTES
     FATNM_LEN       = 8
-    BOOTCODE        = BOOTRECORD+$5A            ' 420 BYTES
+    BOOTCODE        = BOOTREC+$5A               ' 420 BYTES
     BOOTCODE_LEN    = 420
 
     PARTENT_LEN     = 16
@@ -69,12 +69,12 @@ CON
     MBRSIG          = $1FE
     SIG             = $AA55
 
-    ' partition boot record
+    { partition boot record }
 
     FSTYPE_FAT16    = $36                       ' "FAT16"
     FSTYPE_FAT32    = $52                       ' "FAT32"
 
-    ' FS information sector
+    { FS information sector }
     FSINFOSIG1      = $000
     FSISIG1         = $41_61_52_52              ' RRaA
     FSINFOSIG2      = $1E4
@@ -84,13 +84,13 @@ CON
     FSINFOSIG3      = $1FC
     FSISIG3         = $AA550000
 
-    MRKR_EOC        = $0FFF_FFFF                ' end of chain (last cluster)
+    CLUST_EOC       = $0FFF_FFFF                ' end of chain (last cluster)
 
 VAR
 
     long _ptr_fatimg
 
-    ' BIOS parameter block (BPB)
+    { BIOS parameter block (BPB) }
     long _clust_shf
     long _clust_total
     long _clust_rtdir_st
@@ -121,7 +121,6 @@ VAR
     word _sect_fsinfo
     word _sect_rsvd
 
-'    word _sect_sz 'xxx some method to compare this to requested sect size on Init()?
     word _sect_per_part
     word _sect_per_trk
     word _sigxaa55
@@ -129,10 +128,8 @@ VAR
     byte _drv_num
     byte _fat_medtyp
     byte _nr_fats
-    byte _sect_per_clust 'xxx check is a power of 2
+    byte _sect_per_clust
     byte _sigx29
-    byte _fstype[8] 'xxx just one byte and store 0 or 1?    'XXX not used
-    byte _twofats 'XXX not used
 
     byte _boot_code[BOOTCODE_LEN]
     byte _str_fatnm[FATNM_LEN+1]
@@ -140,8 +137,8 @@ VAR
     byte _str_vol_nm[VOLNM_LEN+1]
 
 CON
-' Directory entry ("dirent")
-    ' offsets within root dir sector
+{ Directory entry ("dirent") }
+    { offsets within root dir sector }
     DIRENT_LEN      = 32
     DIRENT_FN       = $00                       ' filename
     DIRENT_EXT      = $08                       ' filename extension
@@ -156,7 +153,7 @@ CON
     DIRENT_FCLUST_L = $1A                       ' first cluster (LSW)
     DIRENT_SZ       = $1C                       ' size
 
-    ' file attributes
+    { file attributes }
     FATTR_ARC       = 1 << 5                    ' is an archive
     FATTR_SUBDIR    = 1 << 4                    ' is a sub-directory
     FATTR_VOL_NM    = 1 << 3                    ' is the volume name
@@ -166,7 +163,7 @@ CON
     FATTR_DEL       = $E5                       ' FN first char, if deleted
 
 VAR
-' Directory entry
+{ Directory entry }
     'xxx byte array? cache currently open file's dirent, then can write a modified one back to disk
     long _file_nr                               ' file number within root dir
     byte _str_fn[8+1]                           ' filename string
@@ -182,10 +179,7 @@ VAR
     word _clust_file_l                          ' last cluster # (LSW)
     long _file_sz                               ' file size
 
-    ' current file
-    '   is open
-    '   current seek position
-    '   bytes remaining from seek to end
+    { current file }
     long _next_clust, _prev_clust
 
 OBJ
@@ -217,7 +211,7 @@ PUB ReadBPB{}   ' xxx validate signatures before syncing?
     bytemove(@_str_fatnm, _ptr_fatimg+FATNM, FATNM_LEN)
     bytemove(@_fat_ver, _ptr_fatimg+FAT32VERS, 2)
 
-    ' updates FATFlags() and FATMirroring()
+    { updates FATFlags() and FATMirroring() }
     bytemove(@_fat_flags, _ptr_fatimg+FLAGS, 2)
     bytemove(@_sect_fsinfo, _ptr_fatimg+FSINFOSECT, 2)
     bytemove(@_sig_fsi1, _ptr_fatimg+FSINFOSIG1, 4)
@@ -241,7 +235,7 @@ PUB ReadBPB{}   ' xxx validate signatures before syncing?
     _sigx29 := byte[_ptr_fatimg][SIGX29]
     bytemove(@_sigxaa55, _ptr_fatimg+MBRSIG, 2)
     bytefill(@_str_vol_nm, 0, VOLNM_LEN)      ' clear string buffer
-    ' copy volume name string from boot record to string buffer
+    { copy volume name string from boot record to string buffer }
     bytemove(@_str_vol_nm, _ptr_fatimg+VOLNM, VOLNM_LEN)
 
     _sect_fat1_st := _part_st + _sect_rsvd
@@ -391,7 +385,7 @@ PUB FCreateTime{}: t
     return _time_cr
 
 PUB FEnd{}: p
-' Last byte number of file
+' Last position in file
     return (_file_sz - 1)
 
 PUB FDeleted{}: d
@@ -427,8 +421,8 @@ PUB FSize{}: sz
 '   Returns: long
     return _file_sz
 
-PUB FSizeUpdate(new_sz)
-' Update file size
+PUB SetFSize(new_sz)
+' Set file size (cached copy)
     _file_sz := new_sz
 
 PUB FTotalClust{}: c
@@ -491,13 +485,13 @@ PUB FSISSigValidMask{}: m
 ' FS information signatures valid
 '   Returns: 3bit mask [SIG3..SIG2..SIG1]
 '       0: signature not valid, 1: signature valid
-    if _sig_fsi1 == FSISIG1
+    if (_sig_fsi1 == FSISIG1)
         m |= %001
 
-    if _sig_fsi2 == FSISIG2
+    if (_sig_fsi2 == FSISIG2)
         m |= %010
 
-    if _sig_fsi3 == FSISIG3
+    if (_sig_fsi3 == FSISIG3)
         m |= %100
 
 PUB FOpen(fnum)
@@ -521,8 +515,8 @@ PUB FOpen(fnum)
     bytemove(@_clust_file_l, fnum+DIRENT_FCLUST_L, 2)
     bytemove(@_file_sz, fnum+DIRENT_SZ, 4)
 
-    ' when opening the file, initialize next and prev cluster numbers with
-    '   the file's first cluster number
+    { when opening the file, initialize next and prev cluster numbers with
+        the file's first cluster number }
     _next_clust := (_clust_file_h << 16) | (_clust_file_l)
     _prev_clust := _next_clust
 
@@ -560,11 +554,11 @@ PUB NextClust{}: c
 ' Get next cluster number in chain
 '   Returns: long
     c := 0
-    ' update the next and prev cluster pointers, by following the chain
-    '   read from the FAT
+    { update the next and prev cluster pointers, by following the chain
+        read from the FAT }
     _prev_clust := _next_clust
     _next_clust := fatent2clust(_prev_clust & $7f)
-    if _next_clust == MRKR_EOC                  ' End-of-Chain marker reached
+    if (_next_clust == CLUST_EOC)               ' End-of-Chain marker reached
         return -1                               '   no more clusters
     return _next_clust
 
