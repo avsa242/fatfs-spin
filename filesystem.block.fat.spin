@@ -279,6 +279,17 @@ PUB FATEnt2Clust(fat_chn): cl
 ' Get cluster number pointed to by FAT entry/chain
     bytemove(@cl, _ptr_fatimg+(fat_chn * 4), 4)
 
+PUB FAttrs{}: a
+' File attributes
+'   Returns: bitmap
+'       bit 5: is an archive
+'           4: is a subdirectory
+'           3: is the volume name
+'           2: is a system file
+'           1: is a hidden file
+'           0: is write-protected
+    return _file_attr & $3F
+
 PUB FClose{}
 ' Close currently open file
     bytefill(@_str_fn, 0, 9)
@@ -295,16 +306,26 @@ PUB FClose{}
     longfill(@_file_sz, 0, 1)
     longfill(@_next_clust, 0, 2)
 
-PUB FileAttrs{}: a
-' File attributes
+PUB FDateAcc{}: d
+' Date file was last accessed
 '   Returns: bitmap
-'       bit 5: is an archive
-'           4: is a subdirectory
-'           3: is the volume name
-'           2: is a system file
-'           1: is a hidden file
-'           0: is write-protected
-    return _file_attr & $3F
+'       bit 15..9: year from 1980
+'       bit 8..5: month
+'       bit 4..0: day
+    return _date_lastxs
+
+PUB FDateCreated{}: d
+' Date file was created
+'   Returns: bitmap
+'       bit 15..9: year from 1980 (e.g., 41 = 2021 (80+41-100=21))
+'       bit 8..5: month
+'       bit 4..0: day
+    return _date_cr
+
+PUB FDeleted{}: d
+' Flag indicating file is deleted
+'   Returns: boolean
+    return (_str_fn[0] == FATTR_DEL)            ' FN first char is xE5?
 
 PUB FFirstClust{}: c ' xxx which is faster, the below, or c.word[1] :=, c.word[0] := ... ?
 ' First cluster of file
@@ -316,35 +337,19 @@ PUB FFirstSect{}: s
 '   Returns: long
     return clust2sect(ffirstclust{})
 
-PUB FCreateTime_ms{}: ms
-' Timestamp of file creation, in milliseconds
-'   Returns: byte
-    return _time_cr_ms
-
-PUB FCreateDate{}: d
-' Date file was created
-'   Returns: bitmap
-'       bit 15..9: year from 1980 (e.g., 41 = 2021 (80+41-100=21))
-'       bit 8..5: month
-'       bit 4..0: day
-    return _date_cr
-
-PUB FCreateTime{}: t
-' Time file was created
-'   Returns: bitmap
-'       bit 15..11: hours
-'       bit 10..5: minutes
-'       bit 4..0: 2 second intervals
-    return _time_cr
-
 PUB FEnd{}: p
 ' Last position in file
     return (_file_sz - 1)
 
-PUB FDeleted{}: d
-' Flag indicating file is deleted
+PUB FIsDir{}: bool
+' Flag indicating file is a (sub)directory
 '   Returns: boolean
-    return (_str_fn[0] == FATTR_DEL)            ' FN first char is xE5?
+    return ((fattrs{} & FATTR_SUBDIR) <> 0)
+
+PUB FIsVolNm{}: bool
+' Flag indicating file is the volume name
+'   Returns: boolean
+    return ((fattrs{} & FATTR_VOL_NM) <> 0)
 
 PUB FName{}: ptr_str
 ' File name
@@ -356,14 +361,14 @@ PUB FNameExt{}: ptr_str
 '   Returns: pointer to string
     return @_str_fext
 
+PUB FNextClust{}: c
+' Next cluster used by file
+    return _next_clust
+
 PUB FNum{}: f_no
 ' File number within directory
 '   Returns: integer
     return _file_nr
-
-PUB FNextClust{}: c
-' Next cluster used by file
-    return _next_clust
 
 PUB FPrevClust{}: c
 ' Previous cluster used by file
@@ -373,31 +378,6 @@ PUB FSize{}: sz
 ' File size, in bytes
 '   Returns: long
     return _file_sz
-
-PUB SetFSize(new_sz)
-' Set file size (cached copy)
-    _file_sz := new_sz
-
-PUB FTotalClust{}: c
-' Total number of clusters occupied by file
-'   Returns: long
-'   NOTE: This value is inferred from known file size, bytes per sector,
-'       and sectors per cluster
-    return 1 #> (_file_sz / (_sect_sz * _sect_per_clust))
-
-PUB FTotalSect{}: s
-' Total number of sectors occupied by file
-'   Returns: long
-'   NOTE: This value is inferred from known file size and bytes per sector
-    return filesize{} / _sect_sz
-
-PUB FAccDate{}: d
-' Date file was last accessed
-'   Returns: bitmap
-'       bit 15..9: year from 1980
-'       bit 8..5: month
-'       bit 4..0: day
-    return _date_lastxs
 
 PUB FModDate{}: d
 ' Date file was last modified
@@ -414,20 +394,6 @@ PUB FModTime{}: t
 '       bit 10..5: minutes
 '       bit 4..0: 2 second intervals
     return _time_lastwr
-
-PUB SetFModDate(date_word)
-' Update file modified datestamp
-'       bit 15..9: year from 1980
-'       bit 8..5: month
-'       bit 4..0: day
-    _date_lastwr := date_word
-
-PUB SetFModTime(time_word)
-' Update file modified timestamp
-'       bit 15..11: hours
-'       bit 10..5: minutes
-'       bit 4..0: 2 second intervals
-    _time_lastwr := time_word
 
 PUB FOpen(fnum)
 ' Open file
@@ -455,10 +421,31 @@ PUB FOpen(fnum)
     _next_clust := (_clust_file_h << 16) | (_clust_file_l)
     _prev_clust := _next_clust
 
-PUB IsDir{}: bool
-' Flag indicating file is a (sub)directory
-'   Returns: boolean
-    return ((fileattrs{} & FATTR_SUBDIR) <> 0)
+PUB FTimeCreated{}: t
+' Time file was created
+'   Returns: bitmap
+'       bit 15..11: hours
+'       bit 10..5: minutes
+'       bit 4..0: 2 second intervals
+    return _time_cr
+
+PUB FTimeCreated_ms{}: ms
+' Timestamp of file creation, in milliseconds
+'   Returns: byte
+    return _time_cr_ms
+
+PUB FTotalClust{}: c
+' Total number of clusters occupied by file
+'   Returns: long
+'   NOTE: This value is inferred from known file size, bytes per sector,
+'       and sectors per cluster
+    return 1 #> (_file_sz / (_sect_sz * _sect_per_clust))
+
+PUB FTotalSect{}: s
+' Total number of sectors occupied by file
+'   Returns: long
+'   NOTE: This value is inferred from known file size and bytes per sector
+    return filesize{} / _sect_sz
 
 PUB LogicalSectSz{}: b
 ' Size of logical sector, in bytes
@@ -508,6 +495,24 @@ PUB SectsPerFAT{}: spf
 ' Sectors per FAT
 '   Returns: long
     return _sect_per_fat
+
+PUB SetFModDate(date_word)
+' Update file modified datestamp
+'       bit 15..9: year from 1980
+'       bit 8..5: month
+'       bit 4..0: day
+    _date_lastwr := date_word
+
+PUB SetFModTime(time_word)
+' Update file modified timestamp
+'       bit 15..11: hours
+'       bit 10..5: minutes
+'       bit 4..0: 2 second intervals
+    _time_lastwr := time_word
+
+PUB SetFSize(new_sz)
+' Set file size (cached copy)
+    _file_sz := new_sz
 
 PUB Sig0x29Valid{}: bool
 ' Flag indicating signature byte 0x29 is valid
