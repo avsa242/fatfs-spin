@@ -99,12 +99,10 @@ VAR
     long _data_region
     long _endofchain
     long _sect_fat1_st
-    long _part_sn
     long _part_st
     long _rootdir
     long _rootdirend
     long _root_ents
-    long _sect_hidn
     long _sect_per_fat
     long _sect_rtdir_st
     long _sig_fsi1
@@ -112,28 +110,19 @@ VAR
     long _sig_fsi3
 
     word _fat_actv
-    word _fat_flags
     word _fat_ver
-    word _nr_heads
     word _rsvd
-    word _sect_bkupboot
     word _sect_sz
-    word _sect_fsinfo
     word _sect_rsvd
 
     word _sect_per_part
-    word _sect_per_trk
     word _sigxaa55
 
-    byte _drv_num
-    byte _fat_medtyp
     byte _nr_fats
     byte _sect_per_clust
     byte _sigx29
 
-    byte _boot_code[BOOTCODE_LEN]
     byte _str_fatnm[FATNM_LEN+1]
-    byte _str_oem_nm[FATOEMNM_LEN+1]
     byte _str_vol_nm[VOLNM_LEN+1]
 
 CON
@@ -206,32 +195,20 @@ PUB ReadPart{}
 PUB ReadBPB{}   ' xxx validate signatures before syncing?
 ' Synchronize BIOS Parameter Block data with currently active sector buffer
     _fat_actv := (byte[_ptr_fatimg][FLAGS] >> ACTVFAT) & $7F
-    bytemove(@_sect_bkupboot, _ptr_fatimg+BKUPBOOTSECT, 2)
-    bytemove(@_boot_code, _ptr_fatimg+BOOTCODE, BOOTCODE_LEN)
     bytemove(@_str_fatnm, _ptr_fatimg+FATNM, FATNM_LEN)
     bytemove(@_fat_ver, _ptr_fatimg+FAT32VERS, 2)
 
     { updates FATFlags() and FATMirroring() }
-    bytemove(@_fat_flags, _ptr_fatimg+FLAGS, 2)
-    bytemove(@_sect_fsinfo, _ptr_fatimg+FSINFOSECT, 2)
     bytemove(@_sig_fsi1, _ptr_fatimg+FSINFOSIG1, 4)
     bytemove(@_sig_fsi2, _ptr_fatimg+FSINFOSIG2, 4)
     bytemove(@_sig_fsi3, _ptr_fatimg+FSINFOSIG3, 4)
-    bytemove(@_nr_heads, _ptr_fatimg+NRHEADS, 2)
-    bytemove(@_sect_hidn, _ptr_fatimg+NRHIDDENSECT, 4)
-    _drv_num := byte[_ptr_fatimg][PARTLOGICLDN]
     bytemove(@_sect_sz, _ptr_fatimg+BYTESPERLSECT, 2)
-    _fat_medtyp := byte[_ptr_fatimg][MEDIADESC]
     _nr_fats := byte[_ptr_fatimg][FATCOPIES]
-    bytefill(@_str_oem_nm, 0, FATOEMNM_LEN+1)
-    bytemove(@_str_oem_nm, _ptr_fatimg+FATOEMNM, FATOEMNM_LEN+1)
     bytemove(@_sect_per_part, _ptr_fatimg+SECTPERPART, 4)
-    bytemove(@_part_sn, _ptr_fatimg+PART_SN, 4)
     bytemove(@_sect_rsvd, _ptr_fatimg+RSVDSECTS, 2)
     bytemove(@_clust_rtdir_st, _ptr_fatimg+ROOTDIRCLUST, 4)
     _sect_per_clust := byte[_ptr_fatimg][SECPERCLUST]
     bytemove(@_sect_per_fat, _ptr_fatimg+SECTPERFAT, 4)
-    bytemove(@_sect_per_trk, _ptr_fatimg+SECTPERTRK, 2)
     _sigx29 := byte[_ptr_fatimg][SIGX29]
     bytemove(@_sigxaa55, _ptr_fatimg+MBRSIG, 2)
     bytefill(@_str_vol_nm, 0, VOLNM_LEN)      ' clear string buffer
@@ -255,16 +232,6 @@ PUB ActiveFAT{}: fat_nr
 '   Returns: u7
     return _fat_actv & $7F
 
-PUB BackupBootSect{}: s
-' Backup boot sector number
-'   Returns: word
-    return _sect_bkupboot
-
-PUB BootCodePtr{}: ptr
-' Boot code
-'   Returns: pointer to buffer containing boot code 'XXX indicate how many bytes it is
-    return @_boot_code
-
 PUB ClustSz{}: b
 ' Number of bytes per cluster:
 '   Returns: long
@@ -286,10 +253,6 @@ PUB ClustLastSect{}: sect
 ' Last sector of cluster
 '   Returns: long
     return (clust2sect(_next_clust) + _sect_per_clust)-1
-
-PUB DataStart{}: sect
-
-    return _data_region
 
 PUB DirEntNeverUsed{}: bool
 ' Flag indicating directory entry never used
@@ -315,16 +278,6 @@ PUB FAT32Version{}: v
 PUB FATEnt2Clust(fat_chn): cl
 ' Get cluster number pointed to by FAT entry/chain
     bytemove(@cl, _ptr_fatimg+(fat_chn * 4), 4)
-
-PUB FATFlags{}: f
-' Flags
-'   Returns: word
-    return _fat_flags
-
-PUB FATMirroring{}: state
-' Flag indicating FAT mirroring is enabled
-'   Returns: boolean
-    return ((_fat_flags >> FATMIRROR) & 1) == 0
 
 PUB FClose{}
 ' Close currently open file
@@ -476,24 +429,6 @@ PUB SetFModTime(time_word)
 '       bit 4..0: 2 second intervals
     _time_lastwr := time_word
 
-PUB FSInfoSect{}: s
-' Filesystem info sector
-'   Returns: word
-    return _sect_fsinfo
-
-PUB FSISSigValidMask{}: m
-' FS information signatures valid
-'   Returns: 3bit mask [SIG3..SIG2..SIG1]
-'       0: signature not valid, 1: signature valid
-    if (_sig_fsi1 == FSISIG1)
-        m |= %001
-
-    if (_sig_fsi2 == FSISIG2)
-        m |= %010
-
-    if (_sig_fsi3 == FSISIG3)
-        m |= %100
-
 PUB FOpen(fnum)
 ' Open file
 '   NOTE: No validation is performed on data in sector buffer
@@ -520,35 +455,16 @@ PUB FOpen(fnum)
     _next_clust := (_clust_file_h << 16) | (_clust_file_l)
     _prev_clust := _next_clust
 
-PUB Heads{}: h
-' Number of heads
-'   Returns: word
-    return _nr_heads
-
-PUB HiddenSect{}: s
-' Number of hidden sectors in partition
-'   Returns: long
-    return _sect_hidn
-
 PUB IsDir{}: bool
 ' Flag indicating file is a (sub)directory
 '   Returns: boolean
-    return (fileattrs{} & FSUBDIR) <> 0
-
-PUB LogicalDrvNum{}: n
-' Logical drive number of partition
-'   Returns: byte
-    return _drv_num
+    return ((fileattrs{} & FATTR_SUBDIR) <> 0)
 
 PUB LogicalSectSz{}: b
 ' Size of logical sector, in bytes
 '   Returns: word
 '   NOTE: Values returned should be powers of 2 only
     return _sect_sz
-
-PUB MediaType{}: t
-' Media type of FAT
-    return _fat_medtyp
 
 PUB NextClust{}: c
 ' Get next cluster number in chain
@@ -562,33 +478,10 @@ PUB NextClust{}: c
         return -1                               '   no more clusters
     return _next_clust
 
-PUB NumberFATs{}: n
-' Number of copies of FAT
-    return _nr_fats
-
-PUB OEMName{}: ptr_name
-' OEM name string
-'   Returns: pointer to string buffer
-    return @_str_oem_nm
-
 PUB PartStart{}: sect
 ' Partition starting offset
 '   Returns: long
     return _part_st
-
-PUB PartSects{}: s
-' Sectors in partition
-'   Returns: long
-    return _sect_per_part
-
-PUB PartSN{}: s
-' Partition serial number
-'   Returns: long
-    return _part_sn
-
-PUB ReservedSects{}: r
-' Number of reserved sectors
-    return _sect_rsvd
 
 PUB RootDirClust{}: c
 ' Cluster number of the start of the root directory
@@ -615,11 +508,6 @@ PUB SectsPerFAT{}: spf
 ' Sectors per FAT
 '   Returns: long
     return _sect_per_fat
-
-PUB SectsPerTrack{}: spt
-' Sectors per track
-'   Retunrs: word
-    return _sect_per_trk
 
 PUB Sig0x29Valid{}: bool
 ' Flag indicating signature byte 0x29 is valid
