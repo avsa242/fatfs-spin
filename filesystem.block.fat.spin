@@ -5,7 +5,7 @@
     Description: FAT filesystem engine
     Copyright (c) 2022
     Started Aug 1, 2021
-    Updated Jun 5, 2022
+    Updated Jun 7, 2022
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -254,6 +254,7 @@ PUB SyncBPB{}   ' xxx validate signatures before syncing?
     _rootdirend := _rootdir + (_root_ents << math.log2(DIRENT_LEN))
     _clust_total := ((_sect_per_part - _data_region + _part_st) >> _clust_shf)
     _sect_rtdir_st := _sect_fat1_st + (_nr_fats * _sect_per_fat)
+    _clust_sz := _sect_per_clust * _sect_sz
 
 PUB ActiveFAT{}: fat_nr
 ' Active FAT copy
@@ -273,7 +274,7 @@ PUB BootCodePtr{}: ptr
 PUB BytesPerClust{}: b
 ' Number of bytes per cluster:
 '   Returns: long
-    return _sect_per_clust * _sect_sz
+    return _clust_sz
 
 PUB BytesPerSect{}: b
 ' Number of bytes per sector
@@ -561,8 +562,8 @@ PUB NextCluster{}: c
     c := 0
     ' update the next and prev cluster pointers, by following the chain
     '   read from the FAT
-    _next_clust := fatent2clust(_prev_clust & $7f)
     _prev_clust := _next_clust
+    _next_clust := fatent2clust(_prev_clust & $7f)
     if _next_clust == MRKR_EOC                  ' End-of-Chain marker reached
         return -1                               '   no more clusters
     return _next_clust
