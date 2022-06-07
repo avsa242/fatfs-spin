@@ -19,8 +19,8 @@ CON
     MBR             = 0                         ' these two refer to the same
     BOOTRECORD      = 0
     JMPBOOT         = BOOTRECORD+$00            ' 3 bytes
-    FATOEMNAME      = BOOTRECORD+$03            ' 8
-    FATOEMNAME_LEN  = 8                         ' text + NUL
+    FATOEMNM        = BOOTRECORD+$03            ' 8
+    FATOEMNM_LEN    = 8                         ' text + NUL
     BYTESPERLSECT   = BOOTRECORD+$0B            ' 2
     SECPERCLUST     = BOOTRECORD+$0D            ' 1
     RSVDSECTS       = BOOTRECORD+$0E            ' 2
@@ -35,16 +35,16 @@ CON
     FATMIRROR       = 15
     ACTVFAT         = 8                         ' LOWER 7 BITS
     FAT32VERS       = BOOTRECORD+$2A            ' 2
-    ROOTDIRCLUST    = BOOTRECORD+$2C            ' 4
-    FSINFOSECT      = BOOTRECORD+$30            ' 2
+    RTDIRCLUST      = BOOTRECORD+$2C            ' 4
+    FS_INFOSECT     = BOOTRECORD+$30            ' 2
     BKUPBOOTSECT    = BOOTRECORD+$32            ' 2
     PARTLOGICLDN    = BOOTRECORD+$40            ' 1
     SIGX29          = BOOTRECORD+$42            ' 1
     PART_SN         = BOOTRECORD+$43            ' LE LONG
-    VOLNAME         = BOOTRECORD+$47            ' 11 BYTES
-    VOLNAME_LEN     = 11
-    FATNAME         = BOOTRECORD+$52            ' 8 BYTES
-    FATNAME_LEN     = 8
+    VOLNM           = BOOTRECORD+$47            ' 11 BYTES
+    VOLNM_LEN       = 11
+    FATNM           = BOOTRECORD+$52            ' 8 BYTES
+    FATNM_LEN       = 8
     BOOTCODE        = BOOTRECORD+$5A            ' 420 BYTES
     BOOTCODE_LEN    = 420
 
@@ -135,35 +135,35 @@ VAR
     byte _twofats 'XXX not used
 
     byte _boot_code[BOOTCODE_LEN]
-    byte _str_fatnm[FATNAME_LEN+1]
-    byte _str_oem_nm[FATOEMNAME_LEN+1]
-    byte _str_vol_nm[VOLNAME_LEN+1]
+    byte _str_fatnm[FATNM_LEN+1]
+    byte _str_oem_nm[FATOEMNM_LEN+1]
+    byte _str_vol_nm[VOLNM_LEN+1]
 
 CON
 ' Directory entry ("dirent")
     ' offsets within root dir sector
     DIRENT_LEN      = 32
-    FNAME           = $00                       ' filename
-    FNEXT           = $08                       ' filename extension
-    FATTR           = $0B                       ' file attributes
-    FCREATE_TMS     = $0D                       ' creation timestamp (ms)
-    FCREATE_T       = $0E                       ' creation timestamp
-    FCREATE_D       = $10                       ' creation datestamp
-    FLSTXS_D        = $12                       ' last accessed datestamp
-    FCLUST_H        = $14                       ' first cluster (MSW, FAT32)
-    FLSTWR_T        = $16                       ' last written timestamp
-    FLSTWR_D        = $18                       ' last written datestamp
-    FCLUST_L        = $1A                       ' first cluster (LSW)
-    FSZ             = $1C                       ' size
+    DIRENT_FN       = $00                       ' filename
+    DIRENT_EXT      = $08                       ' filename extension
+    DIRENT_ATTRS    = $0B                       ' file attributes
+    DIRENT_TSC_MS   = $0D                       ' creation timestamp (ms)
+    DIRENT_TSC      = $0E                       ' creation timestamp
+    DIRENT_DSC      = $10                       ' creation datestamp
+    DIRENT_DSXS     = $12                       ' last accessed datestamp
+    DIRENT_FCLUST_H = $14                       ' first cluster (MSW, FAT32)
+    DIRENT_TSM      = $16                       ' last written timestamp
+    DIRENT_DSM      = $18                       ' last written datestamp
+    DIRENT_FCLUST_L = $1A                       ' first cluster (LSW)
+    DIRENT_SZ       = $1C                       ' size
 
     ' file attributes
-    FARC            = 1 << 5                    ' is an archive
-    FSUBDIR         = 1 << 4                    ' is a sub-directory
-    FVOL_NM         = 1 << 3                    ' is the volume name
-    FSYSFIL         = 1 << 2                    ' is a system file
-    FHIDNFIL        = 1 << 1                    ' is hidden
-    FWRPROT         = 1                         ' is write-protected
-    FDEL_MARKER     = $E5                       ' FN first char, if deleted
+    FATTR_ARC       = 1 << 5                    ' is an archive
+    FATTR_SUBDIR    = 1 << 4                    ' is a sub-directory
+    FATTR_VOL_NM    = 1 << 3                    ' is the volume name
+    FATTR_SYSFIL    = 1 << 2                    ' is a system file
+    FATTR_HIDDEN    = 1 << 1                    ' is hidden
+    FATTR_WRPROT    = 1                         ' is write-protected
+    FATTR_DEL       = $E5                       ' FN first char, if deleted
 
 VAR
 ' Directory entry
@@ -214,7 +214,7 @@ PUB ReadBPB{}   ' xxx validate signatures before syncing?
     _fat_actv := (byte[_ptr_fatimg][FLAGS] >> ACTVFAT) & $7F
     bytemove(@_sect_bkupboot, _ptr_fatimg+BKUPBOOTSECT, 2)
     bytemove(@_boot_code, _ptr_fatimg+BOOTCODE, BOOTCODE_LEN)
-    bytemove(@_str_fatnm, _ptr_fatimg+FATNAME, FATNAME_LEN)
+    bytemove(@_str_fatnm, _ptr_fatimg+FATNM, FATNM_LEN)
     bytemove(@_fat_ver, _ptr_fatimg+FAT32VERS, 2)
 
     ' updates FATFlags() and FATMirroring()
@@ -229,8 +229,8 @@ PUB ReadBPB{}   ' xxx validate signatures before syncing?
     bytemove(@_sect_sz, _ptr_fatimg+BYTESPERLSECT, 2)
     _fat_medtyp := byte[_ptr_fatimg][MEDIADESC]
     _nr_fats := byte[_ptr_fatimg][FATCOPIES]
-    bytefill(@_str_oem_nm, 0, FATOEMNAME_LEN+1)
-     bytemove(@_str_oem_nm, _ptr_fatimg+FATOEMNAME, FATOEMNAME_LEN+1)
+    bytefill(@_str_oem_nm, 0, FATOEMNM_LEN+1)
+    bytemove(@_str_oem_nm, _ptr_fatimg+FATOEMNM, FATOEMNM_LEN+1)
     bytemove(@_sect_per_part, _ptr_fatimg+SECTPERPART, 4)
     bytemove(@_part_sn, _ptr_fatimg+PART_SN, 4)
     bytemove(@_sect_rsvd, _ptr_fatimg+RSVDSECTS, 2)
@@ -240,9 +240,9 @@ PUB ReadBPB{}   ' xxx validate signatures before syncing?
     bytemove(@_sect_per_trk, _ptr_fatimg+SECTPERTRK, 2)
     _sigx29 := byte[_ptr_fatimg][SIGX29]
     bytemove(@_sigxaa55, _ptr_fatimg+MBRSIG, 2)
-    bytefill(@_str_vol_nm, 0, VOLNAME_LEN)      ' clear string buffer
+    bytefill(@_str_vol_nm, 0, VOLNM_LEN)      ' clear string buffer
     ' copy volume name string from boot record to string buffer
-    bytemove(@_str_vol_nm, _ptr_fatimg+VOLNAME, VOLNAME_LEN)
+    bytemove(@_str_vol_nm, _ptr_fatimg+VOLNM, VOLNM_LEN)
 
     _sect_fat1_st := _part_st + _sect_rsvd
     _clust_shf := math.log2(_sect_per_clust)
@@ -367,7 +367,7 @@ PUB FFirstClust{}: c ' xxx which is faster, the below, or c.word[1] :=, c.word[0
 PUB FFirstSect{}: s
 ' First sector of file
 '   Returns: long
-    return clust2sect(filefirstclust{})
+    return clust2sect(ffirstclust{})
 
 PUB FCreateTime_ms{}: ms
 ' Timestamp of file creation, in milliseconds
@@ -397,7 +397,7 @@ PUB FEnd{}: p
 PUB FDeleted{}: d
 ' Flag indicating file is deleted
 '   Returns: boolean
-    return _str_fn[0] == FDEL_MARKER            ' FN first char is xE5?
+    return (_str_fn[0] == FATTR_DEL)            ' FN first char is xE5?
 
 PUB FName{}: ptr_str
 ' File name
@@ -508,18 +508,18 @@ PUB FOpen(fnum)
     bytefill(@_str_fn, 0, 9)                    ' clear string buffers
     bytefill(@_str_fext, 0, 4)
 
-    bytemove(@_str_fn, fnum+FNAME, 8)
-    bytemove(@_str_fext, fnum+FNEXT, 3)
-    bytemove(@_file_attr, fnum+FATTR, 1)
-    bytemove(@_time_cr_ms, fnum+FCREATE_TMS, 1)
-    bytemove(@_time_cr, fnum+FCREATE_T, 2)
-    bytemove(@_date_cr, fnum+FCREATE_D, 2)
-    bytemove(@_date_lastxs, fnum+FLSTXS_D, 2)
-    bytemove(@_clust_file_h, fnum+FCLUST_H, 2)
-    bytemove(@_time_lastwr, fnum+FLSTWR_T, 2)
-    bytemove(@_date_lastwr, fnum+FLSTWR_D, 2)
-    bytemove(@_clust_file_l, fnum+FCLUST_L, 2)
-    bytemove(@_file_sz, fnum+FSZ, 4)
+    bytemove(@_str_fn, fnum+DIRENT_FN, 8)
+    bytemove(@_str_fext, fnum+DIRENT_EXT, 3)
+    bytemove(@_file_attr, fnum+DIRENT_ATTRS, 1)
+    bytemove(@_time_cr_ms, fnum+DIRENT_TSC_MS, 1)
+    bytemove(@_time_cr, fnum+DIRENT_TSC, 2)
+    bytemove(@_date_cr, fnum+DIRENT_DSC, 2)
+    bytemove(@_date_lastxs, fnum+DIRENT_DSXS, 2)
+    bytemove(@_clust_file_h, fnum+DIRENT_FCLUST_H, 2)
+    bytemove(@_time_lastwr, fnum+DIRENT_TSM, 2)
+    bytemove(@_date_lastwr, fnum+DIRENT_DSM, 2)
+    bytemove(@_clust_file_l, fnum+DIRENT_FCLUST_L, 2)
+    bytemove(@_file_sz, fnum+DIRENT_SZ, 4)
 
     ' when opening the file, initialize next and prev cluster numbers with
     '   the file's first cluster number
