@@ -204,12 +204,12 @@ PUB DeInit{}
 
     _ptr_fatimg := 0
 
-PUB SyncPart{}
+PUB ReadPart{}
 ' Synchronize partition start offset with pointer in currently active
 '   sector buffer (currently hardcoded for partition #1)
     bytemove(@_part_st, _ptr_fatimg+PART1ENT+PART_START, 4)
 
-PUB SyncBPB{}   ' xxx validate signatures before syncing?
+PUB ReadBPB{}   ' xxx validate signatures before syncing?
 ' Synchronize BIOS Parameter Block data with currently active sector buffer
     _fat_actv := (byte[_ptr_fatimg][FLAGS] >> ACTVFAT) & $7F
     bytemove(@_sect_bkupboot, _ptr_fatimg+BKUPBOOTSECT, 2)
@@ -271,12 +271,12 @@ PUB BootCodePtr{}: ptr
 '   Returns: pointer to buffer containing boot code 'XXX indicate how many bytes it is
     return @_boot_code
 
-PUB BytesPerClust{}: b
+PUB ClustSz{}: b
 ' Number of bytes per cluster:
 '   Returns: long
     return _clust_sz
 
-PUB BytesPerSect{}: b
+PUB SectSz{}: b
 ' Number of bytes per sector
 '   Returns: word
     return _sect_sz
@@ -359,22 +359,22 @@ PUB FileAttrs{}: a
 '           0: is write-protected
     return _file_attr & $3F
 
-PUB FileFirstClust{}: c ' xxx which is faster, the below, or c.word[1] :=, c.word[0] := ... ?
+PUB FFirstClust{}: c ' xxx which is faster, the below, or c.word[1] :=, c.word[0] := ... ?
 ' First cluster of file
 '   Returns: long
     return (_clust_file_h << 16) | _clust_file_l
 
-PUB FileFirstSect{}: s
+PUB FFirstSect{}: s
 ' First sector of file
 '   Returns: long
     return clust2sect(filefirstclust{})
 
-PUB FileCreateMS{}: ms
+PUB FCreateTime_ms{}: ms
 ' Timestamp of file creation, in milliseconds
 '   Returns: byte
     return _time_cr_ms
 
-PUB FileCreateDate{}: d
+PUB FCreateDate{}: d
 ' Date file was created
 '   Returns: bitmap
 '       bit 15..9: year from 1980 (e.g., 41 = 2021 (80+41-100=21))
@@ -382,7 +382,7 @@ PUB FileCreateDate{}: d
 '       bit 4..0: day
     return _date_cr
 
-PUB FileCreateTime{}: t
+PUB FCreateTime{}: t
 ' Time file was created
 '   Returns: bitmap
 '       bit 15..11: hours
@@ -390,39 +390,39 @@ PUB FileCreateTime{}: t
 '       bit 4..0: 2 second intervals
     return _time_cr
 
-PUB FileEnd{}: p
+PUB FEnd{}: p
 ' Last byte number of file
     return (_file_sz - 1)
 
-PUB FileIsDeleted{}: d
+PUB FDeleted{}: d
 ' Flag indicating file is deleted
 '   Returns: boolean
     return _str_fn[0] == FDEL_MARKER            ' FN first char is xE5?
 
-PUB FileName{}: ptr_str
+PUB FName{}: ptr_str
 ' File name
 '   Returns: pointer to string
     return @_str_fn
 
-PUB FileNameExt{}: ptr_str
+PUB FNameExt{}: ptr_str
 ' File name extension
 '   Returns: pointer to string
     return @_str_fext
 
-PUB FileNum{}: f_no
+PUB FNum{}: f_no
 ' File number within directory
 '   Returns: integer
     return _file_nr
 
-PUB FileNextClust{}: c
+PUB FNextClust{}: c
 ' Next cluster used by file
     return _next_clust
 
-PUB FilePrevClust{}: c
+PUB FPrevClust{}: c
 ' Previous cluster used by file
     return _prev_clust
 
-PUB FileSize{}: sz
+PUB FSize{}: sz
 ' File size, in bytes
 '   Returns: long
     return _file_sz
@@ -431,20 +431,20 @@ PUB FSizeUpdate(new_sz)
 ' Update file size
     _file_sz := new_sz
 
-PUB FileTotalClust{}: c
+PUB FTotalClust{}: c
 ' Total number of clusters occupied by file
 '   Returns: long
 '   NOTE: This value is inferred from known file size, bytes per sector,
 '       and sectors per cluster
     return 1 #> (_file_sz / (_sect_sz * _sect_per_clust))
 
-PUB FileTotalSect{}: s
+PUB FTotalSect{}: s
 ' Total number of sectors occupied by file
 '   Returns: long
 '   NOTE: This value is inferred from known file size and bytes per sector
     return filesize{} / _sect_sz
 
-PUB FLastAccDate{}: d
+PUB FAccDate{}: d
 ' Date file was last accessed
 '   Returns: bitmap
 '       bit 15..9: year from 1980
@@ -452,7 +452,7 @@ PUB FLastAccDate{}: d
 '       bit 4..0: day
     return _date_lastxs
 
-PUB FLastModDate{}: d
+PUB FModDate{}: d
 ' Date file was last modified
 '   Returns: bitmap
 '       bit 15..9: year from 1980
@@ -460,7 +460,7 @@ PUB FLastModDate{}: d
 '       bit 4..0: day
     return _date_lastwr
 
-PUB FLastModTime{}: t
+PUB FModTime{}: t
 ' Time file was last modified
 '   Returns: bitmap
 '       bit 15..11: hours
@@ -468,26 +468,26 @@ PUB FLastModTime{}: t
 '       bit 4..0: 2 second intervals
     return _time_lastwr
 
-PUB FModDate(date_word)
+PUB SetFModDate(date_word)
 ' Update file modified datestamp
 '       bit 15..9: year from 1980
 '       bit 8..5: month
 '       bit 4..0: day
     _date_lastwr := date_word
 
-PUB FModTime(time_word)
+PUB SetFModTime(time_word)
 ' Update file modified timestamp
 '       bit 15..11: hours
 '       bit 10..5: minutes
 '       bit 4..0: 2 second intervals
     _time_lastwr := time_word
 
-PUB FInfoSector{}: s
+PUB FSInfoSect{}: s
 ' Filesystem info sector
 '   Returns: word
     return _sect_fsinfo
 
-PUB FISSigValidMask{}: m
+PUB FSISSigValidMask{}: m
 ' FS information signatures valid
 '   Returns: 3bit mask [SIG3..SIG2..SIG1]
 '       0: signature not valid, 1: signature valid
@@ -531,12 +531,12 @@ PUB Heads{}: h
 '   Returns: word
     return _nr_heads
 
-PUB HiddenSectors{}: s
+PUB HiddenSect{}: s
 ' Number of hidden sectors in partition
 '   Returns: long
     return _sect_hidn
 
-PUB IsDirectory{}: bool
+PUB IsDir{}: bool
 ' Flag indicating file is a (sub)directory
 '   Returns: boolean
     return (fileattrs{} & FSUBDIR) <> 0
@@ -546,7 +546,7 @@ PUB LogicalDrvNum{}: n
 '   Returns: byte
     return _drv_num
 
-PUB LogicalSectorBytes{}: b
+PUB LogicalSectSz{}: b
 ' Size of logical sector, in bytes
 '   Returns: word
 '   NOTE: Values returned should be powers of 2 only
@@ -556,7 +556,7 @@ PUB MediaType{}: t
 ' Media type of FAT
     return _fat_medtyp
 
-PUB NextCluster{}: c
+PUB NextClust{}: c
 ' Get next cluster number in chain
 '   Returns: long
     c := 0
@@ -582,7 +582,7 @@ PUB PartStart{}: sect
 '   Returns: long
     return _part_st
 
-PUB PartSectors{}: s
+PUB PartSects{}: s
 ' Sectors in partition
 '   Returns: long
     return _sect_per_part
@@ -592,16 +592,16 @@ PUB PartSN{}: s
 '   Returns: long
     return _part_sn
 
-PUB ReservedSectors{}: r
+PUB ReservedSects{}: r
 ' Number of reserved sectors
     return _sect_rsvd
 
-PUB RootDirCluster{}: c
+PUB RootDirClust{}: c
 ' Cluster number of the start of the root directory
 '   Returns: long
     return _clust_rtdir_st
 
-PUB RootDirSector{}: s
+PUB RootDirSect{}: s
 ' Starting sector of root directory entry
 '   Returns: long
     return _sect_rtdir_st
@@ -611,18 +611,18 @@ PUB Sect2Clust(sect): clust
 '   Returns: long
     clust := ((sect - _data_region) / _sect_per_clust)
 
-PUB SectorsPerCluster{}: spc
+PUB SectsPerClust{}: spc
 ' Sectors per cluster (usually 32)
 '   Returns: byte
 '   NOTE: Values returned should be powers of 2 only
     return _sect_per_clust
 
-PUB SectorsPerFAT{}: spf
+PUB SectsPerFAT{}: spf
 ' Sectors per FAT
 '   Returns: long
     return _sect_per_fat
 
-PUB SectorsPerTrack{}: spt
+PUB SectsPerTrack{}: spt
 ' Sectors per track
 '   Retunrs: word
     return _sect_per_trk
@@ -637,7 +637,7 @@ PUB Sig0xAA55Valid{}: bool
 '   Returns: boolean
     return (_sigxaa55 == SIG)
 
-PUB VolumeName{}: ptr_str
+PUB VolName{}: ptr_str
 ' Volume name of FAT partition
 '   Returns: pointer to 11-char string
     return @_str_vol_nm
