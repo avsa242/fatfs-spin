@@ -5,7 +5,7 @@
     Description: FAT filesystem engine
     Copyright (c) 2022
     Started Aug 1, 2021
-    Updated Jun 7, 2022
+    Updated Jun 8, 2022
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -198,7 +198,6 @@ PUB ReadBPB{}   ' xxx validate signatures before syncing?
     bytemove(@_str_fatnm, _ptr_fatimg+FATNM, FATNM_LEN)
     bytemove(@_fat_ver, _ptr_fatimg+FAT32VERS, 2)
 
-    { updates FATFlags() and FATMirroring() }
     bytemove(@_sig_fsi1, _ptr_fatimg+FSINFOSIG1, 4)
     bytemove(@_sig_fsi2, _ptr_fatimg+FSINFOSIG2, 4)
     bytemove(@_sig_fsi3, _ptr_fatimg+FSINFOSIG3, 4)
@@ -395,8 +394,8 @@ PUB FModTime{}: t
 '       bit 4..0: 2 second intervals
     return _time_lastwr
 
-PUB FOpen(fnum)
-' Open file
+PUB FOpenEnt(fnum)
+' Open file by dirent #
 '   NOTE: No validation is performed on data in sector buffer
     _file_nr := fnum
     fnum := _ptr_fatimg + (fnum * DIRENT_LEN)   ' calc offset for this file
