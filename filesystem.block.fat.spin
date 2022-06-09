@@ -5,7 +5,7 @@
     Description: FAT filesystem engine
     Copyright (c) 2022
     Started Aug 1, 2021
-    Updated Jun 8, 2022
+    Updated Jun 9, 2022
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -258,6 +258,11 @@ PUB DirEntNeverUsed{}: bool
 '   Returns: boolean
     { first character of filename is NUL? Directory entry was never used }
     return (_str_fn[0] == $00)
+
+PUB DirentStart(ent_nr)
+' Offset within directory entry sector, given entry number
+'   Returns: integer
+    return (ent_nr * DIRENT_LEN)
 
 PUB FAT1Start{}: s
 ' Starting sector of FAT1
