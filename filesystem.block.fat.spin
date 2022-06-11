@@ -209,15 +209,15 @@ PUB ReadBPB{} | tmp
 
     _fat_actv := (byte[_ptr_fatimg][FLAGS] >> ACTVFAT) & $7F
     bytemove(@_str_fatnm, _ptr_fatimg+FATNM, FATNM_LEN)
-    bytemove(@_fat_ver, _ptr_fatimg+FAT32VERS, 2)
+    wordmove(@_fat_ver, _ptr_fatimg+FAT32VERS, 1)
 
     bytemove(@_sig_fsi1, _ptr_fatimg+FSINFOSIG1, 4)
     bytemove(@_sig_fsi2, _ptr_fatimg+FSINFOSIG2, 4)
     bytemove(@_sig_fsi3, _ptr_fatimg+FSINFOSIG3, 4)
-    bytemove(@_sect_sz, _ptr_fatimg+BYTESPERLSECT, 2)
+    wordmove(@_sect_sz, _ptr_fatimg+BYTESPERLSECT, 1)
     _nr_fats := byte[_ptr_fatimg][FATCOPIES]
-    bytemove(@_sect_per_part, _ptr_fatimg+SECTPERPART, 4)
-    bytemove(@_sect_rsvd, _ptr_fatimg+RSVDSECTS, 2)
+    longmove(@_sect_per_part, _ptr_fatimg+SECTPERPART, 1)
+    wordmove(@_sect_rsvd, _ptr_fatimg+RSVDSECTS, 1)
     bytemove(@_clust_rtdir_st, _ptr_fatimg+ROOTDIRCLUST, 4)
     _sect_per_clust := byte[_ptr_fatimg][SECPERCLUST]
     bytemove(@_sect_per_fat, _ptr_fatimg+SECTPERFAT, 4)
