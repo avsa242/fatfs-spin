@@ -322,6 +322,7 @@ PUB FClose{}
     wordfill(@_clust_file_l, 0, 1)
     longfill(@_file_sz, 0, 1)
     longfill(@_next_clust, 0, 2)
+    _file_nr := 0
 
 PUB FDateAcc{}: d
 ' Date file was last accessed
