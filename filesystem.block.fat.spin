@@ -5,7 +5,7 @@
     Description: FAT filesystem engine
     Copyright (c) 2022
     Started Aug 1, 2021
-    Updated Jun 9, 2022
+    Updated Jun 11, 2022
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -67,7 +67,8 @@ CON
     P1_TOTALSECT    = PART1ENT+PART_TOTALSECT
 
     MBRSIG          = $1FE
-    SIG             = $AA55
+    PARTSIG         = $1FE
+    SIG_WORD        = $AA55
 
     { partition boot record }
 
@@ -187,13 +188,25 @@ PUB DeInit{}
 
     _ptr_fatimg := 0
 
-PUB ReadPart{}
+PUB ReadPart{} | tmp
 ' Synchronize partition start offset with pointer in currently active
 '   sector buffer (currently hardcoded for partition #1)
+
+    { validate the image first: don't read metadata unless it contains the FAT signature }
+    wordmove(@tmp, _ptr_fatimg+MBRSIG, 1)
+    if (tmp <> SIG_WORD)
+        return -1
+
     bytemove(@_part_st, _ptr_fatimg+PART1ENT+PART_START, 4)
 
-PUB ReadBPB{}   ' xxx validate signatures before syncing?
+PUB ReadBPB{} | tmp
 ' Synchronize BIOS Parameter Block data with currently active sector buffer
+
+    { validate the image first: don't read metadata unless it contains the FAT signature }
+    wordmove(@tmp, _ptr_fatimg+MBRSIG, 1)
+    if (tmp <> SIG_WORD)
+        return -1
+
     _fat_actv := (byte[_ptr_fatimg][FLAGS] >> ACTVFAT) & $7F
     bytemove(@_str_fatnm, _ptr_fatimg+FATNM, FATNM_LEN)
     bytemove(@_fat_ver, _ptr_fatimg+FAT32VERS, 2)
