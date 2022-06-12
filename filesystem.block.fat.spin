@@ -5,7 +5,7 @@
     Description: FAT filesystem engine
     Copyright (c) 2022
     Started Aug 1, 2021
-    Updated Jun 11, 2022
+    Updated Jun 12, 2022
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -153,24 +153,14 @@ CON
     FATTR_DEL       = $E5                       ' FN first char, if deleted
 
 VAR
-{ Directory entry }
-    'xxx byte array? cache currently open file's dirent, then can write a modified one back to disk
+{ Directory entry cache }
     long _file_nr                               ' file number within root dir
-    byte _str_fn[8+1]                           ' filename string
-    byte _str_fext[3+1]                         ' filename extension string
-    byte _file_attr                             ' file attributes
-    byte _time_cr_ms                            ' creation time, milliseconds
-    word _time_cr                               ' creation time
-    word _date_cr                               ' creation date
-    word _date_lastxs                           ' last access date
-    word _clust_file_h                          ' first cluster # (MSW, FAT32)
-    word _time_lastwr                           ' last written time
-    word _date_lastwr                           ' last written date
-    word _clust_file_l                          ' last cluster # (LSW)
-    long _file_sz                               ' file size
+    byte _dirent[DIRENT_LEN]
 
     { current file }
     long _next_clust, _prev_clust
+
+    byte _fname[8+1], _fext[3+1]
 
 OBJ
 
@@ -270,7 +260,7 @@ PUB DirEntNeverUsed{}: bool
 ' Flag indicating directory entry never used
 '   Returns: boolean
     { first character of filename is NUL? Directory entry was never used }
-    return (_str_fn[0] == $00)
+    return (_dirent[0] == $00)
 
 PUB DirentStart(ent_nr)
 ' Offset within directory entry sector, given entry number
@@ -305,50 +295,39 @@ PUB FAttrs{}: a
 '           2: is a system file
 '           1: is a hidden file
 '           0: is write-protected
-    return _file_attr & $3F
+    return _dirent[DIRENT_ATTRS] & $3f
 
 PUB FClose{}
 ' Close currently open file
-    bytefill(@_str_fn, 0, 9)
-    bytefill(@_str_fext, 0, 4)
-    bytefill(@_file_attr, 0, 1)
-    bytefill(@_time_cr_ms, 0, 1)
-    wordfill(@_time_cr, 0, 1)
-    wordfill(@_date_cr, 0, 1)
-    wordfill(@_date_lastxs, 0, 1)
-    wordfill(@_clust_file_h, 0, 1)
-    wordfill(@_time_lastwr, 0, 1)
-    wordfill(@_date_lastwr, 0, 1)
-    wordfill(@_clust_file_l, 0, 1)
-    longfill(@_file_sz, 0, 1)
-    longfill(@_next_clust, 0, 2)
+    bytefill(@_dirent, 0, DIRENT_LEN)
     _file_nr := 0
 
-PUB FDateAcc{}: d
+PUB FDateAcc{}: dsxs
 ' Date file was last accessed
 '   Returns: bitmap
 '       bit 15..9: year from 1980
 '       bit 8..5: month
 '       bit 4..0: day
-    return _date_lastxs
+    bytemove(@dsxs, @_dirent+DIRENT_DSXS, 2)
 
-PUB FDateCreated{}: d
+PUB FDateCreated{}: dsc
 ' Date file was created
 '   Returns: bitmap
 '       bit 15..9: year from 1980 (e.g., 41 = 2021 (80+41-100=21))
 '       bit 8..5: month
 '       bit 4..0: day
-    return _date_cr
+    bytemove(@dsc, @_dirent+DIRENT_DSC, 2)
 
 PUB FDeleted{}: d
 ' Flag indicating file is deleted
 '   Returns: boolean
-    return (_str_fn[0] == FATTR_DEL)            ' FN first char is xE5?
+    return (_dirent[0] == FATTR_DEL)            ' FN first char is $E5?
 
-PUB FFirstClust{}: c ' xxx which is faster, the below, or c.word[1] :=, c.word[0] := ... ?
+PUB FFirstClust{}: fcl
 ' First cluster of file
 '   Returns: long
-    return (_clust_file_h << 16) | _clust_file_l
+    bytemove(@fcl.byte[2], @_dirent[DIRENT_FCLUST_H], 2)
+    bytemove(@fcl.byte[0], @_dirent[DIRENT_FCLUST_L], 2)
 
 PUB FFirstSect{}: s
 ' First sector of file
@@ -372,18 +351,22 @@ PUB FIsVolNm{}: bool
 PUB FName{}: ptr_str
 ' File name
 '   Returns: pointer to string
-    return @_str_fn
+    bytefill(@_fname, 0, 9)
+    bytemove(@_fname, @_dirent, 8)
+    return @_fname
 
 PUB FNameExt{}: ptr_str
 ' File name extension
 '   Returns: pointer to string
-    return @_str_fext
+    bytefill(@_fext, 0, 4)
+    bytemove(@_fext, @_dirent+DIRENT_EXT, 3)
+    return @_fext
 
 PUB FNextClust{}: c
 ' Next cluster used by file
     return _next_clust
 
-PUB FNum{}: f_no
+PUB FNumber{}: f_no
 ' File number within directory
 '   Returns: integer
     return _file_nr
@@ -392,65 +375,96 @@ PUB FPrevClust{}: c
 ' Previous cluster used by file
     return _prev_clust
 
+PUB FSetAttrs(attrs)
+' Set file attributes (byte)
+    _dirent[DIRENT_ATTRS] := attrs
+
+PUB FSetDateAccessed(dsxs)
+' Set file last access date (word)
+    bytemove(@_dirent+DIRENT_DSXS, @dsxs, 2)
+
+PUB FSetDateCreated(dsc)
+' Set file creation date (word)
+    bytemove(@_dirent+DIRENT_DSC, @dsc, 2)
+
+PUB FSetDateMod(dsm)
+' Set file last modified date (word)
+    bytemove(@_dirent+DIRENT_DSM, @dsm, 2)
+
+PUB FSetExt(ptr_str)
+' Set filename extension (pointer to 3-byte string)
+    bytemove(@_dirent+DIRENT_EXT, ptr_str, 3)
+
+PUB FSetFirstClust(clust_nr)
+' Set file first cluster number (long)
+    bytemove(@_dirent+DIRENT_FCLUST_H, @clust_nr.byte[2], 2)
+    bytemove(@_dirent+DIRENT_FCLUST_L, @clust_nr.byte[0], 2)
+
+PUB FSetFname(ptr_str)
+' Set filename (pointer to 8-byte string)
+    bytemove(@_dirent, ptr_str, 8)
+
+PUB FSetSize(sz)
+' Set file size (long)
+    bytemove(@_dirent+DIRENT_SZ, @sz, 4)
+
+PUB FSetTimeCreated(tsc)
+' Set file creation time (word)
+    bytemove(@_dirent+DIRENT_TSC, @tsc, 2)
+
+PUB FSetTimeMod(tsm)
+' Set file last modified time (word)
+    bytemove(@_dirent+DIRENT_TSM, @tsm, 2)
+
 PUB FSize{}: sz
 ' File size, in bytes
 '   Returns: long
-    return _file_sz
+    bytemove(@sz, @_dirent+DIRENT_SZ, 4)
 
-PUB FModDate{}: d
+PUB FModDate{}: dsm
 ' Date file was last modified
 '   Returns: bitmap
 '       bit 15..9: year from 1980
 '       bit 8..5: month
 '       bit 4..0: day
-    return _date_lastwr
+    bytemove(@dsm, @_dirent+DIRENT_DSM, 2)
 
-PUB FModTime{}: t
+PUB FModTime{}: tsm
 ' Time file was last modified
 '   Returns: bitmap
 '       bit 15..11: hours
 '       bit 10..5: minutes
 '       bit 4..0: 2 second intervals
-    return _time_lastwr
+    bytemove(@tsm, @_dirent+DIRENT_TSM, 2)
 
-PUB FOpenEnt(fnum)
-' Open file by dirent #
+PUB ReadDirEnt(fnum) | sect_offs
+' Read metadata about file from dirent # fnum
 '   NOTE: No validation is performed on data in sector buffer
     _file_nr := fnum
-    fnum := _ptr_fatimg + (fnum * DIRENT_LEN)   ' calc offset for this file
-    bytefill(@_str_fn, 0, 9)                    ' clear string buffers
-    bytefill(@_str_fext, 0, 4)
 
-    bytemove(@_str_fn, fnum+DIRENT_FN, 8)
-    bytemove(@_str_fext, fnum+DIRENT_EXT, 3)
-    bytemove(@_file_attr, fnum+DIRENT_ATTRS, 1)
-    bytemove(@_time_cr_ms, fnum+DIRENT_TSC_MS, 1)
-    bytemove(@_time_cr, fnum+DIRENT_TSC, 2)
-    bytemove(@_date_cr, fnum+DIRENT_DSC, 2)
-    bytemove(@_date_lastxs, fnum+DIRENT_DSXS, 2)
-    bytemove(@_clust_file_h, fnum+DIRENT_FCLUST_H, 2)
-    bytemove(@_time_lastwr, fnum+DIRENT_TSM, 2)
-    bytemove(@_date_lastwr, fnum+DIRENT_DSM, 2)
-    bytemove(@_clust_file_l, fnum+DIRENT_FCLUST_L, 2)
-    bytemove(@_file_sz, fnum+DIRENT_SZ, 4)
+    { get sector buffer offset for entry and copy the entry into the dirent cache }
+    sect_offs := _ptr_fatimg + direntstart(fnum)
+    bytefill(@_dirent, 0, DIRENT_LEN)
+    bytemove(@_dirent, sect_offs, DIRENT_LEN)
 
     { when opening the file, initialize next and prev cluster numbers with
         the file's first cluster number }
-    _next_clust := (_clust_file_h << 16) | (_clust_file_l)
+    bytemove(@_next_clust.byte[2], @_dirent+DIRENT_FCLUST_H, 2)
+    bytemove(@_next_clust.byte[0], @_dirent+DIRENT_FCLUST_L, 2)
     _prev_clust := _next_clust
 
-PUB FTimeCreated{}: t
+PUB FTimeCreated{}: tsc
 ' Time file was created
-'   Returns: bitmap
+'   Returns: bitmap (word)
 '       bit 15..11: hours
 '       bit 10..5: minutes
 '       bit 4..0: 2 second intervals
-    return _time_cr
+    bytemove(@tsc, @_dirent+DIRENT_TSC, 2)
 
 PUB FTimeCreated_ms{}: ms
 ' Timestamp of file creation, in milliseconds
 '   Returns: byte
-    return _time_cr_ms
+    return _dirent[DIRENT_TSC_MS]
 
 PUB FTotalClust{}: c
 ' Total number of clusters occupied by file
@@ -513,24 +527,6 @@ PUB SectsPerFAT{}: spf
 ' Sectors per FAT
 '   Returns: long
     return _sect_per_fat
-
-PUB SetFModDate(date_word)
-' Update file modified datestamp
-'       bit 15..9: year from 1980
-'       bit 8..5: month
-'       bit 4..0: day
-    _date_lastwr := date_word
-
-PUB SetFModTime(time_word)
-' Update file modified timestamp
-'       bit 15..11: hours
-'       bit 10..5: minutes
-'       bit 4..0: 2 second intervals
-    _time_lastwr := time_word
-
-PUB SetFSize(new_sz)
-' Set file size (cached copy)
-    _file_sz := new_sz
 
 PUB Sig0x29Valid{}: bool
 ' Flag indicating signature byte 0x29 is valid
