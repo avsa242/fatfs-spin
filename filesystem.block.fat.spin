@@ -336,7 +336,7 @@ PUB FFirstSect{}: s
 
 PUB FEnd{}: p
 ' Last position in file
-    return (_file_sz - 1)
+    return fsize{}-1
 
 PUB FIsDir{}: bool
 ' Flag indicating file is a (sub)directory
@@ -471,7 +471,7 @@ PUB FTotalClust{}: c
 '   Returns: long
 '   NOTE: This value is inferred from known file size, bytes per sector,
 '       and sectors per cluster
-    return 1 #> (_file_sz / (_sect_sz * _sect_per_clust))
+    return 1 #> (fsize{} / (_sect_sz * _sect_per_clust))
 
 PUB FTotalSect{}: s
 ' Total number of sectors occupied by file
@@ -536,7 +536,7 @@ PUB Sig0x29Valid{}: bool
 PUB Sig0xAA55Valid{}: bool
 ' Flag indicating signature word 0xAA55 is valid
 '   Returns: boolean
-    return (_sigxaa55 == SIG)
+    return (_sigxaa55 == SIG_WORD)
 
 PUB VolName{}: ptr_str
 ' Volume name of FAT partition
