@@ -5,7 +5,7 @@
     Description: FAT filesystem engine
     Copyright (c) 2022
     Started Aug 1, 2021
-    Updated Jun 12, 2022
+    Updated Jun 13, 2022
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -255,6 +255,17 @@ PUB ClustLastSect{}: sect
 ' Last sector of cluster
 '   Returns: long
     return (clust2sect(_next_clust) + _sect_per_clust)-1
+
+PUB ClustNum2FATSect(cl_nr): fat_sect
+' Convert cluster number to FAT sector #
+'   Returns: long
+    return (cl_nr >> 7)
+
+PUB ClustNum2Offs(cl_nr): sect_offs
+' Convert cluster number to sector offset
+'   Returns:
+'       0..508
+    return ((cl_nr & $7f) * 4)
 
 PUB DirEntNeverUsed{}: bool
 ' Flag indicating directory entry never used
