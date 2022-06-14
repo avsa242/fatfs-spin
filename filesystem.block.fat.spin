@@ -5,7 +5,7 @@
     Description: FAT filesystem engine
     Copyright (c) 2022
     Started Aug 1, 2021
-    Updated Jun 13, 2022
+    Updated Jun 14, 2022
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -239,11 +239,6 @@ PUB ClustSz{}: b
 '   Returns: long
     return _clust_sz
 
-PUB SectSz{}: b
-' Number of bytes per sector
-'   Returns: word
-    return _sect_sz
-
 PUB Clust2Sect(clust_nr): sect
 ' Starting sector of cluster number
 '   Returns: long
@@ -267,7 +262,13 @@ PUB ClustNum2Offs(cl_nr): sect_offs
 '       0..508
     return ((cl_nr & $7f) * 4)
 
-PUB DirEntNeverUsed{}: bool
+PUB Dirent2Sect(ent_nr): sect
+' Convert directory entry number to sector number
+'   (dirents are 32 bytes in length, for a total of 16 entries in a 512-byte sector;
+'   (0..15) / 16 = 0, (16..31) / 16 = 1, etc
+    return (ent_nr >> 4)
+
+PUB DirentNeverUsed{}: bool
 ' Flag indicating directory entry never used
 '   Returns: boolean
     { first character of filename is NUL? Directory entry was never used }
@@ -528,6 +529,13 @@ PUB Sect2Clust(sect): clust
 '   Returns: long
     clust := ((sect - _data_region) / _sect_per_clust)
 
+PUB SectOffs2Clust(sect_offs)
+' Convert FAT sector offset to cluster number
+'   Valid values: 0..508
+    ifnot (lookdown(sect_offs: 0..508))
+        return -1
+    return (sect_offs / 4)
+
 PUB SectsPerClust{}: spc
 ' Sectors per cluster (usually 32)
 '   Returns: byte
@@ -538,6 +546,11 @@ PUB SectsPerFAT{}: spf
 ' Sectors per FAT
 '   Returns: long
     return _sect_per_fat
+
+PUB SectSz{}: b
+' Number of bytes per sector
+'   Returns: word
+    return _sect_sz
 
 PUB Sig0x29Valid{}: bool
 ' Flag indicating signature byte 0x29 is valid
