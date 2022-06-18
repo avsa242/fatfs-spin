@@ -252,18 +252,18 @@ PUB ClustLastSect{}: sect
     return (clust2sect(_next_clust) + _sect_per_clust)-1
 
 PUB ClustNum2FATSect(cl_nr): fat_sect
-' Convert cluster number to FAT sector #
+' Convert cluster number to _relative_ FAT sector #
 '   Returns: long
     return (cl_nr >> 7)
 
 PUB ClustNum2Offs(cl_nr): sect_offs
-' Convert cluster number to sector offset
+' Convert cluster number to byte offset within FAT sector
 '   Returns:
 '       0..508
     return ((cl_nr & $7f) * 4)
 
 PUB Dirent2Sect(ent_nr): sect
-' Convert directory entry number to sector number
+' Convert directory entry number to _relative_ directory sector number
 '   (dirents are 32 bytes in length, for a total of 16 entries in a 512-byte sector;
 '   (0..15) / 16 = 0, (16..31) / 16 = 1, etc
     return (ent_nr >> 4)
@@ -348,7 +348,7 @@ PUB FFirstSect{}: s
 
 PUB FEnd{}: p
 ' Last position in file
-    return fsize{}-1
+    return (fsize{}-1)
 
 PUB FIsDir{}: bool
 ' Flag indicating file is a (sub)directory
@@ -454,7 +454,7 @@ PUB ReadDirEnt(fnum) | sect_offs
 '   NOTE: No validation is performed on data in sector buffer
     _file_nr := fnum
 
-    { get sector buffer offset for entry and copy the entry into the dirent cache }
+    { copy the entry into the dirent cache }
     sect_offs := _ptr_fatimg + direntstart(fnum)
     bytefill(@_dirent, 0, DIRENT_LEN)
     bytemove(@_dirent, sect_offs, DIRENT_LEN)
@@ -489,7 +489,7 @@ PUB FTotalSect{}: s
 ' Total number of sectors occupied by file
 '   Returns: long
 '   NOTE: This value is inferred from known file size and bytes per sector
-    return filesize{} / _sect_sz
+    return (filesize{} / _sect_sz)
 
 PUB LogicalSectSz{}: b
 ' Size of logical sector, in bytes
@@ -530,14 +530,14 @@ PUB Sect2Clust(sect): clust
     clust := ((sect - _data_region) / _sect_per_clust)
 
 PUB SectOffs2Clust(sect_offs)
-' Convert FAT sector offset to cluster number
+' Convert byte offset within FAT sector to cluster number
 '   Valid values: 0..508
     ifnot (lookdown(sect_offs: 0..508))
         return -1
     return (sect_offs / 4)
 
 PUB SectOffs2AbsClust(sect_offs, fat_sect)
-' Convert FAT sector offset to absolute cluster number
+' Convert byte offset within FAT sector to absolute cluster number
 '   Valid values:
 '       sect_offs: 0..508
 '       fat_sect: 0..n (n is dependent on total number of FAT sectors in the filesystem)
