@@ -449,22 +449,6 @@ PUB FModTime{}: tsm
 '       bit 4..0: 2 second intervals
     bytemove(@tsm, @_dirent+DIRENT_TSM, 2)
 
-PUB ReadDirEnt(fnum) | sect_offs
-' Read metadata about file from dirent # fnum
-'   NOTE: No validation is performed on data in sector buffer
-    _file_nr := fnum
-
-    { copy the entry into the dirent cache }
-    sect_offs := _ptr_fatimg + direntstart(fnum)
-    bytefill(@_dirent, 0, DIRENT_LEN)
-    bytemove(@_dirent, sect_offs, DIRENT_LEN)
-
-    { when opening the file, initialize next and prev cluster numbers with
-        the file's first cluster number }
-    bytemove(@_next_clust.byte[2], @_dirent+DIRENT_FCLUST_H, 2)
-    bytemove(@_next_clust.byte[0], @_dirent+DIRENT_FCLUST_L, 2)
-    _prev_clust := _next_clust
-
 PUB FTimeCreated{}: tsc
 ' Time file was created
 '   Returns: bitmap (word)
@@ -513,6 +497,22 @@ PUB PartStart{}: sect
 ' Partition starting offset
 '   Returns: long
     return _part_st
+
+PUB ReadDirEnt(fnum) | sect_offs
+' Read metadata about file from dirent # fnum
+'   NOTE: No validation is performed on data in sector buffer
+    _file_nr := fnum
+
+    { copy the entry into the dirent cache }
+    sect_offs := _ptr_fatimg + direntstart(fnum)
+    bytefill(@_dirent, 0, DIRENT_LEN)
+    bytemove(@_dirent, sect_offs, DIRENT_LEN)
+
+    { when opening the file, initialize next and prev cluster numbers with
+        the file's first cluster number }
+    bytemove(@_next_clust.byte[2], @_dirent+DIRENT_FCLUST_H, 2)
+    bytemove(@_next_clust.byte[0], @_dirent+DIRENT_FCLUST_L, 2)
+    _prev_clust := _next_clust
 
 PUB RootDirClust{}: c
 ' Cluster number of the start of the root directory
