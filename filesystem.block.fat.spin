@@ -5,7 +5,7 @@
     Description: FAT filesystem engine
     Copyright (c) 2022
     Started Aug 1, 2021
-    Updated Jun 14, 2022
+    Updated Jun 18, 2022
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -535,6 +535,15 @@ PUB SectOffs2Clust(sect_offs)
     ifnot (lookdown(sect_offs: 0..508))
         return -1
     return (sect_offs / 4)
+
+PUB SectOffs2AbsClust(sect_offs, fat_sect)
+' Convert FAT sector offset to absolute cluster number
+'   Valid values:
+'       sect_offs: 0..508
+'       fat_sect: 0..n (n is dependent on total number of FAT sectors in the filesystem)
+    ifnot (lookdown(sect_offs: 0..508))
+        return -1
+    return ((fat_sect << 7) + (sect_offs / 4))
 
 PUB SectsPerClust{}: spc
 ' Sectors per cluster (usually 32)
