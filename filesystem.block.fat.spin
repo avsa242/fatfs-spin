@@ -5,7 +5,7 @@
     Description: FAT filesystem engine
     Copyright (c) 2022
     Started Aug 1, 2021
-    Updated Jun 18, 2022
+    Updated Jun 19, 2022
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -262,6 +262,24 @@ PUB ClustNum2Offs(cl_nr): sect_offs
 '       0..508
     return ((cl_nr & $7f) * 4)
 
+PUB ClustRd(cl_nr): val
+' Read cluster number from FAT entry
+'   Returns: cluster number
+    val := 0
+    bytemove(@val, (_ptr_fatimg + clustnum2offs(cl_nr)), 4)
+
+PUB ClustWr(cl_nr, val)
+' Write cluster number to FAT entry
+'   cl_nr: FAT entry
+'   val: cluster number to write into entry
+    bytemove((_ptr_fatimg + clustnum2offs(cl_nr)), @val, 4)
+
+PUB Dirent2AbsSect(ent_nr): sect
+' Convert directory entry number to _absolute_ directory sector number
+'   (dirents are 32 bytes in length, for a total of 16 entries in a 512-byte sector;
+'   (0..15) / 16 = 0, (16..31) / 16 = 1, etc
+    return (rootdirsect{} + (ent_nr >> 4))
+
 PUB Dirent2Sect(ent_nr): sect
 ' Convert directory entry number to _relative_ directory sector number
 '   (dirents are 32 bytes in length, for a total of 16 entries in a 512-byte sector;
@@ -402,6 +420,10 @@ PUB FSetDateCreated(dsc)
 PUB FSetDateMod(dsm)
 ' Set file last modified date (word)
     bytemove(@_dirent+DIRENT_DSM, @dsm, 2)
+
+PUB FSetDeleted{}
+' Mark file as deleted
+    _dirent[0] := FATTR_DEL
 
 PUB FSetExt(ptr_str)
 ' Set filename extension (pointer to 3-byte string)
