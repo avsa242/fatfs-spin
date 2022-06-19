@@ -130,6 +130,7 @@ CON
 { Directory entry ("dirent") }
     { offsets within root dir sector }
     DIRENT_LEN      = 32
+    DIRENTS         = 16                        ' dirents per sector
     DIRENT_FN       = $00                       ' filename
     DIRENT_EXT      = $08                       ' filename extension
     DIRENT_ATTRS    = $0B                       ' file attributes
@@ -158,7 +159,7 @@ VAR
     byte _dirent[DIRENT_LEN]
 
     { current file }
-    long _next_clust, _prev_clust
+    long _next_clust, _prev_clust, _last_clust
 
     byte _fname[8+1], _fext[3+1]
 
@@ -377,6 +378,10 @@ PUB FIsVolNm{}: bool
 ' Flag indicating file is the volume name
 '   Returns: boolean
     return ((fattrs{} & FATTR_VOL_NM) <> 0)
+
+PUB FLastClust{}: cl_nr
+' Last cluster number of file
+    return _last_clust
 
 PUB FName{}: ptr_str
 ' File name
