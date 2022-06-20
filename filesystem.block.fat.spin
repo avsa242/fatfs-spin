@@ -5,7 +5,7 @@
     Description: FAT filesystem engine
     Copyright (c) 2022
     Started Aug 1, 2021
-    Updated Jun 19, 2022
+    Updated Jun 20, 2022
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -174,6 +174,7 @@ PUB Init(ptr_fatimg)
 ' Initialize
 '   ptr_fatimg: pointer to FAT sector buffer
     _ptr_fatimg := ptr_fatimg
+    _file_nr := -1
 
 PUB DeInit{}
 
@@ -331,7 +332,7 @@ PUB FAttrs{}: a
 PUB FClose{}
 ' Close currently open file
     bytefill(@_dirent, 0, DIRENT_LEN)
-    _file_nr := 0
+    _file_nr := -1
 
 PUB FDateAcc{}: dsxs
 ' Date file was last accessed
@@ -534,6 +535,8 @@ PUB ReadDirEnt(fnum) | sect_offs
     sect_offs := _ptr_fatimg + direntstart(fnum)
     bytefill(@_dirent, 0, DIRENT_LEN)
     bytemove(@_dirent, sect_offs, DIRENT_LEN)
+    bytemove(@_fname, @_dirent, 8)
+    bytemove(@_fext, @_dirent+DIRENT_EXT, 3)
 
     { when opening the file, initialize next and prev cluster numbers with
         the file's first cluster number }
