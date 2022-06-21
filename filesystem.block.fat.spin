@@ -5,7 +5,7 @@
     Description: FAT filesystem engine
     Copyright (c) 2022
     Started Aug 1, 2021
-    Updated Jun 20, 2022
+    Updated Jun 21, 2022
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -85,6 +85,7 @@ CON
     FSINFOSIG3      = $1FC
     FSISIG3         = $AA550000
 
+    CLUST_EOC0      = $0FFF_FFF8
     CLUST_EOC       = $0FFF_FFFF                ' end of chain (last cluster)
 
 VAR
@@ -247,6 +248,10 @@ PUB Clust2Sect(clust_nr): sect
     { convert cluster number to sector number, then offset by where the volume's data
         starts }
     return _data_region + (_sect_per_clust * clust_nr)
+
+PUB ClustIsEOC(clust_nr): iseoc
+' Flag indicating cluster is end-of-chain
+    return (lookdown(clust_nr: CLUST_EOC0..CLUST_EOC) <> 0)
 
 PUB ClustLastSect{}: sect
 ' Last sector of cluster
