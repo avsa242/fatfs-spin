@@ -5,7 +5,7 @@
     Description: FAT filesystem engine
     Copyright (c) 2022
     Started Aug 1, 2021
-    Updated Jun 21, 2022
+    Updated Jun 22, 2022
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -161,8 +161,8 @@ VAR
 
     { current file }
     long _next_clust, _prev_clust, _last_clust
-
-    byte _fname[8+1], _fext[3+1]
+    long _fseek_pos, _fseek_sect
+    byte _fname[8+1], _fext[3+1], _fmode
 
 OBJ
 
@@ -336,8 +336,13 @@ PUB FAttrs{}: a
 
 PUB FClose{}
 ' Close currently open file
+    { clear dirent cache, reset file number, reset seek pointers and file open mode }
     bytefill(@_dirent, 0, DIRENT_LEN)
     _file_nr := -1
+    _fseek_pos := 0
+    _fseek_sect := 0
+    _fmode := 0
+    return 0
 
 PUB FDateAcc{}: dsxs
 ' Date file was last accessed
