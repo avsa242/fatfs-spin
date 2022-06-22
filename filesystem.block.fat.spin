@@ -160,7 +160,7 @@ VAR
     byte _dirent[DIRENT_LEN]
 
     { current file }
-    long _next_clust, _prev_clust, _last_clust
+    long _fclust_next, _fclust_prev, _fclust_last, _fclust_tot
     long _fseek_pos, _fseek_sect
     byte _fname[8+1], _fext[3+1], _fmode
 
@@ -256,7 +256,7 @@ PUB ClustIsEOC(clust_nr): iseoc
 PUB ClustLastSect{}: sect
 ' Last sector of cluster
 '   Returns: long
-    return (clust2sect(_next_clust) + _sect_per_clust)-1
+    return (clust2sect(_fclust_next) + _sect_per_clust)-1
 
 PUB ClustNum2FATSect(cl_nr): fat_sect
 ' Convert cluster number to _relative_ FAT sector #
@@ -392,7 +392,23 @@ PUB FIsVolNm{}: bool
 
 PUB FLastClust{}: cl_nr
 ' Last cluster number of file
-    return _last_clust
+    return _fclust_last
+
+PUB FModDate{}: dsm
+' Date file was last modified
+'   Returns: bitmap
+'       bit 15..9: year from 1980
+'       bit 8..5: month
+'       bit 4..0: day
+    bytemove(@dsm, @_dirent+DIRENT_DSM, 2)
+
+PUB FModTime{}: tsm
+' Time file was last modified
+'   Returns: bitmap
+'       bit 15..11: hours
+'       bit 10..5: minutes
+'       bit 4..0: 2 second intervals
+    bytemove(@tsm, @_dirent+DIRENT_TSM, 2)
 
 PUB FName{}: ptr_str
 ' File name
@@ -410,16 +426,21 @@ PUB FNameExt{}: ptr_str
 
 PUB FNextClust{}: c
 ' Next cluster used by file
-    return _next_clust
+    return _fclust_next
 
 PUB FNumber{}: f_no
 ' File number within directory
 '   Returns: integer
     return _file_nr
 
+PUB FPhysSize{}: sz
+' Physical size of file on disk
+'   Returns: maximum size file _could_ currently occupy, based on cluster allocation
+    return (_fclust_tot * clustsz{})
+
 PUB FPrevClust{}: c
 ' Previous cluster used by file
-    return _prev_clust
+    return _fclust_prev
 
 PUB FSetAttrs(attrs)
 ' Set file attributes (byte)
@@ -471,22 +492,6 @@ PUB FSize{}: sz
 '   Returns: long
     bytemove(@sz, @_dirent+DIRENT_SZ, 4)
 
-PUB FModDate{}: dsm
-' Date file was last modified
-'   Returns: bitmap
-'       bit 15..9: year from 1980
-'       bit 8..5: month
-'       bit 4..0: day
-    bytemove(@dsm, @_dirent+DIRENT_DSM, 2)
-
-PUB FModTime{}: tsm
-' Time file was last modified
-'   Returns: bitmap
-'       bit 15..11: hours
-'       bit 10..5: minutes
-'       bit 4..0: 2 second intervals
-    bytemove(@tsm, @_dirent+DIRENT_TSM, 2)
-
 PUB FTimeCreated{}: tsc
 ' Time file was created
 '   Returns: bitmap (word)
@@ -525,11 +530,11 @@ PUB NextClust{}: c
     c := 0
     { update the next and prev cluster pointers, by following the chain
         read from the FAT }
-    _prev_clust := _next_clust
-    _next_clust := fatent2clust(_prev_clust & $7f)
-    if (_next_clust == CLUST_EOC)               ' End-of-Chain marker reached
+    _fclust_prev := _fclust_next
+    _fclust_next := fatent2clust(_fclust_prev & $7f)
+    if (_fclust_next == CLUST_EOC)               ' End-of-Chain marker reached
         return -1                               '   no more clusters
-    return _next_clust
+    return _fclust_next
 
 PUB PartStart{}: sect
 ' Partition starting offset
@@ -550,9 +555,9 @@ PUB ReadDirEnt(fnum) | sect_offs
 
     { when opening the file, initialize next and prev cluster numbers with
         the file's first cluster number }
-    bytemove(@_next_clust.byte[2], @_dirent+DIRENT_FCLUST_H, 2)
-    bytemove(@_next_clust.byte[0], @_dirent+DIRENT_FCLUST_L, 2)
-    _prev_clust := _next_clust
+    bytemove(@_fclust_next.byte[2], @_dirent+DIRENT_FCLUST_H, 2)
+    bytemove(@_fclust_next.byte[0], @_dirent+DIRENT_FCLUST_L, 2)
+    _fclust_prev := _fclust_next
 
 PUB RootDirClust{}: c
 ' Cluster number of the start of the root directory
