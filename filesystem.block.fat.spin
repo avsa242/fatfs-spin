@@ -5,7 +5,7 @@
     Description: FAT filesystem engine
     Copyright (c) 2022
     Started Aug 1, 2021
-    Updated Jun 22, 2022
+    Updated Aug 22, 2022
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -168,20 +168,20 @@ OBJ
 
     math    : "math.int"
 
-PUB Null{}
+PUB null{}
 ' This is not a top-level object
 
-PUB Init(ptr_fatimg)
+PUB init(ptr_fatimg)
 ' Initialize
 '   ptr_fatimg: pointer to FAT sector buffer
     _ptr_fatimg := ptr_fatimg
     _file_nr := -1
 
-PUB DeInit{}
+PUB deinit{}
 
     _ptr_fatimg := 0
 
-PUB ReadPart{} | tmp
+PUB readpart{} | tmp
 ' Synchronize partition start offset with pointer in currently active
 '   sector buffer (currently hardcoded for partition #1)
 
@@ -192,7 +192,7 @@ PUB ReadPart{} | tmp
 
     bytemove(@_part_st, _ptr_fatimg+PART1ENT+PART_START, 4)
 
-PUB ReadBPB{} | tmp
+PUB readbpb{} | tmp
 ' Synchronize BIOS Parameter Block data with currently active sector buffer
 
     { validate the image first: don't read metadata unless it contains the FAT signature }
@@ -232,98 +232,98 @@ PUB ReadBPB{} | tmp
     _sect_rtdir_st := _sect_fat1_st + (_nr_fats * _sect_per_fat)
     _clust_sz := _sect_per_clust * _sect_sz
 
-PUB ActiveFAT{}: fat_nr
+PUB activefat{}: fat_nr
 ' Active FAT copy
 '   Returns: u7
     return _fat_actv & $7F
 
-PUB ClustSz{}: b
+PUB clustsz{}: b
 ' Number of bytes per cluster:
 '   Returns: long
     return _clust_sz
 
-PUB Clust2Sect(clust_nr): sect
+PUB clust2sect(clust_nr): sect
 ' Starting sector of cluster number
 '   Returns: long
     { convert cluster number to sector number, then offset by where the volume's data
         starts }
     return _data_region + (_sect_per_clust * clust_nr)
 
-PUB ClustIsEOC(clust_nr): iseoc
+PUB clustiseoc(clust_nr): iseoc
 ' Flag indicating cluster is end-of-chain
     return (lookdown(clust_nr: CLUST_EOC0..CLUST_EOC) <> 0)
 
-PUB ClustLastSect{}: sect
+PUB clustlastsect{}: sect
 ' Last sector of cluster
 '   Returns: long
     return (clust2sect(_fclust_next) + _sect_per_clust)-1
 
-PUB ClustNum2FATSect(cl_nr): fat_sect
+PUB clustnum2fatsect(cl_nr): fat_sect
 ' Convert cluster number to _relative_ FAT sector #
 '   Returns: long
     return (cl_nr >> 7)
 
-PUB ClustNum2Offs(cl_nr): sect_offs
+PUB clustnum2offs(cl_nr): sect_offs
 ' Convert cluster number to byte offset within FAT sector
 '   Returns:
 '       0..508
     return ((cl_nr & $7f) * 4)
 
-PUB ClustRd(cl_nr): val
+PUB clustrd(cl_nr): val
 ' Read cluster number from FAT entry
 '   Returns: cluster number
     val := 0
     bytemove(@val, (_ptr_fatimg + clustnum2offs(cl_nr)), 4)
 
-PUB ClustWr(cl_nr, val)
+PUB clustwr(cl_nr, val)
 ' Write cluster number to FAT entry
 '   cl_nr: FAT entry
 '   val: cluster number to write into entry
     bytemove((_ptr_fatimg + clustnum2offs(cl_nr)), @val, 4)
 
-PUB Dirent2AbsSect(ent_nr): sect
+PUB dirent2abssect(ent_nr): sect
 ' Convert directory entry number to _absolute_ directory sector number
 '   (dirents are 32 bytes in length, for a total of 16 entries in a 512-byte sector;
 '   (0..15) / 16 = 0, (16..31) / 16 = 1, etc
     return (rootdirsect{} + (ent_nr >> 4))
 
-PUB Dirent2Sect(ent_nr): sect
+PUB dirent2sect(ent_nr): sect
 ' Convert directory entry number to _relative_ directory sector number
 '   (dirents are 32 bytes in length, for a total of 16 entries in a 512-byte sector;
 '   (0..15) / 16 = 0, (16..31) / 16 = 1, etc
     return (ent_nr >> 4)
 
-PUB DirentNeverUsed{}: bool
+PUB direntneverused{}: bool
 ' Flag indicating directory entry never used
 '   Returns: boolean
     { first character of filename is NUL? Directory entry was never used }
     return (_dirent[0] == $00)
 
-PUB DirentStart(ent_nr)
+PUB direntstart(ent_nr)
 ' Offset within directory entry sector, given entry number
 '   Returns: integer
     return (ent_nr * DIRENT_LEN)
 
-PUB FAT1Start{}: s
+PUB fat1start{}: s
 ' Starting sector of FAT1
 '   Returns: long
     return _sect_fat1_st
 
-PUB FAT32Name{}: s
+PUB fat32name{}: s
 ' FAT name (usually FAT32)
 '   Returns: pointer to string buffer
     return @_str_fatnm
     
-PUB FAT32Version{}: v
+PUB fat32version{}: v
 ' Version of FAT32 driver
 '   Returns word [major..minor]
     return _fat_ver
 
-PUB FATEnt2Clust(fat_chn): cl
+PUB fatent2clust(fat_chn): cl
 ' Get cluster number pointed to by FAT entry/chain
     bytemove(@cl, _ptr_fatimg+(fat_chn * 4), 4)
 
-PUB FAttrs{}: a
+PUB fattrs{}: a
 ' File attributes
 '   Returns: bitmap
 '       bit 5: is an archive
@@ -334,7 +334,7 @@ PUB FAttrs{}: a
 '           0: is write-protected
     return _dirent[DIRENT_ATTRS] & $3f
 
-PUB FClose{}
+PUB fclose{}
 ' Close currently open file
     { clear dirent cache, reset file number, reset seek pointers and file open mode }
     bytefill(@_dirent, 0, DIRENT_LEN)
@@ -344,7 +344,7 @@ PUB FClose{}
     _fmode := 0
     return 0
 
-PUB FDateAcc{}: dsxs
+PUB fdateacc{}: dsxs
 ' Date file was last accessed
 '   Returns: bitmap
 '       bit 15..9: year from 1980
@@ -352,7 +352,7 @@ PUB FDateAcc{}: dsxs
 '       bit 4..0: day
     bytemove(@dsxs, @_dirent+DIRENT_DSXS, 2)
 
-PUB FDateCreated{}: dsc
+PUB fdatecreated{}: dsc
 ' Date file was created
 '   Returns: bitmap
 '       bit 15..9: year from 1980 (e.g., 41 = 2021 (80+41-100=21))
@@ -360,41 +360,41 @@ PUB FDateCreated{}: dsc
 '       bit 4..0: day
     bytemove(@dsc, @_dirent+DIRENT_DSC, 2)
 
-PUB FDeleted{}: d
+PUB fdeleted{}: d
 ' Flag indicating file is deleted
 '   Returns: boolean
     return (_dirent[0] == FATTR_DEL)            ' FN first char is $E5?
 
-PUB FFirstClust{}: fcl
+PUB ffirstclust{}: fcl
 ' First cluster of file
 '   Returns: long
     bytemove(@fcl.byte[2], @_dirent[DIRENT_FCLUST_H], 2)
     bytemove(@fcl.byte[0], @_dirent[DIRENT_FCLUST_L], 2)
 
-PUB FFirstSect{}: s
+PUB ffirstsect{}: s
 ' First sector of file
 '   Returns: long
     return clust2sect(ffirstclust{})
 
-PUB FEnd{}: p
+PUB fend{}: p
 ' Last position in file
     return (fsize{}-1)
 
-PUB FIsDir{}: bool
+PUB fisdir{}: bool
 ' Flag indicating file is a (sub)directory
 '   Returns: boolean
     return ((fattrs{} & FATTR_SUBDIR) <> 0)
 
-PUB FIsVolNm{}: bool
+PUB fisvolnm{}: bool
 ' Flag indicating file is the volume name
 '   Returns: boolean
     return ((fattrs{} & FATTR_VOL_NM) <> 0)
 
-PUB FLastClust{}: cl_nr
+PUB flastclust{}: cl_nr
 ' Last cluster number of file
     return _fclust_last
 
-PUB FModDate{}: dsm
+PUB fmoddate{}: dsm
 ' Date file was last modified
 '   Returns: bitmap
 '       bit 15..9: year from 1980
@@ -402,7 +402,7 @@ PUB FModDate{}: dsm
 '       bit 4..0: day
     bytemove(@dsm, @_dirent+DIRENT_DSM, 2)
 
-PUB FModTime{}: tsm
+PUB fmodtime{}: tsm
 ' Time file was last modified
 '   Returns: bitmap
 '       bit 15..11: hours
@@ -410,89 +410,89 @@ PUB FModTime{}: tsm
 '       bit 4..0: 2 second intervals
     bytemove(@tsm, @_dirent+DIRENT_TSM, 2)
 
-PUB FName{}: ptr_str
+PUB fname{}: ptr_str
 ' File name
 '   Returns: pointer to string
     bytefill(@_fname, 0, 9)
     bytemove(@_fname, @_dirent, 8)
     return @_fname
 
-PUB FNameExt{}: ptr_str
+PUB fnameext{}: ptr_str
 ' File name extension
 '   Returns: pointer to string
     bytefill(@_fext, 0, 4)
     bytemove(@_fext, @_dirent+DIRENT_EXT, 3)
     return @_fext
 
-PUB FNextClust{}: c
+PUB fnextclust{}: c
 ' Next cluster used by file
     return _fclust_next
 
-PUB FNumber{}: f_no
+PUB fnumber{}: f_no
 ' File number within directory
 '   Returns: integer
     return _file_nr
 
-PUB FPhysSize{}: sz
+PUB fphyssize{}: sz
 ' Physical size of file on disk
 '   Returns: maximum size file _could_ currently occupy, based on cluster allocation
     return (_fclust_tot * clustsz{})
 
-PUB FPrevClust{}: c
+PUB fprevclust{}: c
 ' Previous cluster used by file
     return _fclust_prev
 
-PUB FSetAttrs(attrs)
+PUB fsetattrs(attrs)
 ' Set file attributes (byte)
     _dirent[DIRENT_ATTRS] := attrs
 
-PUB FSetDateAccessed(dsxs)
+PUB fsetdateaccessed(dsxs)
 ' Set file last access date (word)
     bytemove(@_dirent+DIRENT_DSXS, @dsxs, 2)
 
-PUB FSetDateCreated(dsc)
+PUB fsetdatecreated(dsc)
 ' Set file creation date (word)
     bytemove(@_dirent+DIRENT_DSC, @dsc, 2)
 
-PUB FSetDateMod(dsm)
+PUB fsetdatemod(dsm)
 ' Set file last modified date (word)
     bytemove(@_dirent+DIRENT_DSM, @dsm, 2)
 
-PUB FSetDeleted{}
+PUB fsetdeleted{}
 ' Mark file as deleted
     _dirent[0] := FATTR_DEL
 
-PUB FSetExt(ptr_str)
+PUB fsetext(ptr_str)
 ' Set filename extension (pointer to 3-byte string)
     bytemove(@_dirent+DIRENT_EXT, ptr_str, 3)
 
-PUB FSetFirstClust(clust_nr)
+PUB fsetfirstclust(clust_nr)
 ' Set file first cluster number (long)
     bytemove(@_dirent+DIRENT_FCLUST_H, @clust_nr.byte[2], 2)
     bytemove(@_dirent+DIRENT_FCLUST_L, @clust_nr.byte[0], 2)
 
-PUB FSetFname(ptr_str)
+PUB fsetfname(ptr_str)
 ' Set filename (pointer to 8-byte string)
     bytemove(@_dirent, ptr_str, 8)
 
-PUB FSetSize(sz)
+PUB fsetsize(sz)
 ' Set file size (long)
     bytemove(@_dirent+DIRENT_SZ, @sz, 4)
 
-PUB FSetTimeCreated(tsc)
+PUB fsettimecreated(tsc)
 ' Set file creation time (word)
     bytemove(@_dirent+DIRENT_TSC, @tsc, 2)
 
-PUB FSetTimeMod(tsm)
+PUB fsettimemod(tsm)
 ' Set file last modified time (word)
     bytemove(@_dirent+DIRENT_TSM, @tsm, 2)
 
-PUB FSize{}: sz
+PUB fsize{}: sz
 ' File size, in bytes
 '   Returns: long
     bytemove(@sz, @_dirent+DIRENT_SZ, 4)
 
-PUB FTimeCreated{}: tsc
+PUB ftimecreated{}: tsc
 ' Time file was created
 '   Returns: bitmap (word)
 '       bit 15..11: hours
@@ -500,31 +500,31 @@ PUB FTimeCreated{}: tsc
 '       bit 4..0: 2 second intervals
     bytemove(@tsc, @_dirent+DIRENT_TSC, 2)
 
-PUB FTimeCreated_ms{}: ms
+PUB ftimecreated_ms{}: ms
 ' Timestamp of file creation, in milliseconds
 '   Returns: byte
     return _dirent[DIRENT_TSC_MS]
 
-PUB FTotalClust{}: c
+PUB ftotalclust{}: c
 ' Total number of clusters occupied by file
 '   Returns: long
 '   NOTE: This value is inferred from known file size, bytes per sector,
 '       and sectors per cluster
     return 1 #> (fsize{} / (_sect_sz * _sect_per_clust))
 
-PUB FTotalSect{}: s
+PUB ftotalsect{}: s
 ' Total number of sectors occupied by file
 '   Returns: long
 '   NOTE: This value is inferred from known file size and bytes per sector
     return (filesize{} / _sect_sz)
 
-PUB LogicalSectSz{}: b
+PUB logicalsectsz{}: b
 ' Size of logical sector, in bytes
 '   Returns: word
 '   NOTE: Values returned should be powers of 2 only
     return _sect_sz
 
-PUB NextClust{}: c
+PUB nextclust{}: c
 ' Get next cluster number in chain
 '   Returns: long
     c := 0
@@ -536,12 +536,12 @@ PUB NextClust{}: c
         return -1                               '   no more clusters
     return _fclust_next
 
-PUB PartStart{}: sect
+PUB partstart{}: sect
 ' Partition starting offset
 '   Returns: long
     return _part_st
 
-PUB ReadDirEnt(fnum) | sect_offs
+PUB readdirent(fnum) | sect_offs
 ' Read metadata about file from dirent # fnum
 '   NOTE: No validation is performed on data in sector buffer
     _file_nr := fnum
@@ -559,29 +559,29 @@ PUB ReadDirEnt(fnum) | sect_offs
     bytemove(@_fclust_next.byte[0], @_dirent+DIRENT_FCLUST_L, 2)
     _fclust_prev := _fclust_next
 
-PUB RootDirClust{}: c
+PUB rootdirclust{}: c
 ' Cluster number of the start of the root directory
 '   Returns: long
     return _clust_rtdir_st
 
-PUB RootDirSect{}: s
+PUB rootdirsect{}: s
 ' Starting sector of root directory entry
 '   Returns: long
     return _sect_rtdir_st
 
-PUB Sect2Clust(sect): clust
+PUB sect2clust(sect): clust
 ' Map given sector number to a cluster number
 '   Returns: long
     clust := ((sect - _data_region) / _sect_per_clust)
 
-PUB SectOffs2Clust(sect_offs)
+PUB sectoffs2clust(sect_offs)
 ' Convert byte offset within FAT sector to cluster number
 '   Valid values: 0..508
     ifnot (lookdown(sect_offs: 0..508))
         return -1
     return (sect_offs / 4)
 
-PUB SectOffs2AbsClust(sect_offs, fat_sect)
+PUB sectoffs2absclust(sect_offs, fat_sect)
 ' Convert byte offset within FAT sector to absolute cluster number
 '   Valid values:
 '       sect_offs: 0..508
@@ -590,56 +590,54 @@ PUB SectOffs2AbsClust(sect_offs, fat_sect)
         return -1
     return ((fat_sect << 7) + (sect_offs / 4))
 
-PUB SectsPerClust{}: spc
+PUB sectsperclust{}: spc
 ' Sectors per cluster (usually 32)
 '   Returns: byte
 '   NOTE: Values returned should be powers of 2 only
     return _sect_per_clust
 
-PUB SectsPerFAT{}: spf
+PUB sectsperfat{}: spf
 ' Sectors per FAT
 '   Returns: long
     return _sect_per_fat
 
-PUB SectSz{}: b
+PUB sectsz{}: b
 ' Number of bytes per sector
 '   Returns: word
     return _sect_sz
 
-PUB Sig0x29Valid{}: bool
+PUB sig0x29valid{}: bool
 ' Flag indicating signature byte 0x29 is valid
 '   Returns: boolean
     return _sigx29 == $29
 
-PUB Sig0xAA55Valid{}: bool
+PUB sig0xaa55valid{}: bool
 ' Flag indicating signature word 0xAA55 is valid
 '   Returns: boolean
     return (_sigxaa55 == SIG_WORD)
 
-PUB VolName{}: ptr_str
+PUB volname{}: ptr_str
 ' Volume name of FAT partition
 '   Returns: pointer to 11-char string
     return @_str_vol_nm
 
 DAT
 {
-    --------------------------------------------------------------------------------------------------------
-    TERMS OF USE: MIT License
+Copyright 2022 Jesse Burt
 
-    Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
-    associated documentation files (the "Software"), to deal in the Software without restriction, including
-    without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-    copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the
-    following conditions:
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+associated documentation files (the "Software"), to deal in the Software without restriction,
+including without limitation the rights to use, copy, modify, merge, publish, distribute,
+sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-    The above copyright notice and this permission notice shall be included in all copies or substantial
-    portions of the Software.
+The above copyright notice and this permission notice shall be included in all copies or
+substantial portions of the Software.
 
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
-    LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-    IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-    WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-    --------------------------------------------------------------------------------------------------------
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
+NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
+OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 }
 
