@@ -5,7 +5,7 @@
     Description: FAT filesystem engine
     Copyright (c) 2022
     Started Aug 1, 2021
-    Updated Aug 22, 2022
+    Updated Aug 23, 2022
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -57,13 +57,13 @@ CON
     PART_STARTCHS   = $01                       ' 3 bytes
     PART_TYPE       = $04
     PART_ENDCHS     = $05
-    PART_START      = $08                       ' LE long at this location
+    PART_STARTSECT  = $08                       ' LE long at this location
     PART_TOTALSECT  = $0C
     P1_STATE        = PART1ENT+PART_STATE
     P1_STARTCHS     = PART1ENT+PART_STARTCHS
     P1_TYPE         = PART1ENT+PART_TYPE
     P1_ENDCHS       = PART1ENT+PART_ENDCHS
-    P1_START        = PART1ENT+PART_START
+    P1_START        = PART1ENT+PART_STARTSECT
     P1_TOTALSECT    = PART1ENT+PART_TOTALSECT
 
     MBRSIG          = $1FE
@@ -181,7 +181,7 @@ PUB deinit{}
 
     _ptr_fatimg := 0
 
-PUB readpart{} | tmp
+PUB read_part{} | tmp
 ' Synchronize partition start offset with pointer in currently active
 '   sector buffer (currently hardcoded for partition #1)
 
@@ -190,9 +190,9 @@ PUB readpart{} | tmp
     if (tmp <> SIG_WORD)
         return -1
 
-    bytemove(@_part_st, _ptr_fatimg+PART1ENT+PART_START, 4)
+    bytemove(@_part_st, _ptr_fatimg+PART1ENT+PART_STARTSECT, 4)
 
-PUB readbpb{} | tmp
+PUB read_bpb{} | tmp
 ' Synchronize BIOS Parameter Block data with currently active sector buffer
 
     { validate the image first: don't read metadata unless it contains the FAT signature }
@@ -211,7 +211,7 @@ PUB readbpb{} | tmp
     _nr_fats := byte[_ptr_fatimg][FATCOPIES]
     bytemove(@_sect_per_part, _ptr_fatimg+SECTPERPART, 4)
     bytemove(@_sect_rsvd, _ptr_fatimg+RSVDSECTS, 2)
-    bytemove(@_clust_rtdir_st, _ptr_fatimg+ROOTDIRCLUST, 4)
+    bytemove(@_clust_rtdir_st, _ptr_fatimg+RTDIRCLUST, 4)
     _sect_per_clust := byte[_ptr_fatimg][SECPERCLUST]
     bytemove(@_sect_per_fat, _ptr_fatimg+SECTPERFAT, 4)
     _sigx29 := byte[_ptr_fatimg][SIGX29]
@@ -232,94 +232,94 @@ PUB readbpb{} | tmp
     _sect_rtdir_st := _sect_fat1_st + (_nr_fats * _sect_per_fat)
     _clust_sz := _sect_per_clust * _sect_sz
 
-PUB activefat{}: fat_nr
+PUB active_fat{}: fat_nr
 ' Active FAT copy
 '   Returns: u7
     return _fat_actv & $7F
 
-PUB clustsz{}: b
+PUB clust_sz{}: b
 ' Number of bytes per cluster:
 '   Returns: long
     return _clust_sz
 
-PUB clust2sect(clust_nr): sect
+PUB clust_to_sect(clust_nr): sect
 ' Starting sector of cluster number
 '   Returns: long
     { convert cluster number to sector number, then offset by where the volume's data
         starts }
     return _data_region + (_sect_per_clust * clust_nr)
 
-PUB clustiseoc(clust_nr): iseoc
+PUB clust_is_eoc(clust_nr): iseoc
 ' Flag indicating cluster is end-of-chain
     return (lookdown(clust_nr: CLUST_EOC0..CLUST_EOC) <> 0)
 
-PUB clustlastsect{}: sect
+PUB clust_last_sect{}: sect
 ' Last sector of cluster
 '   Returns: long
-    return (clust2sect(_fclust_next) + _sect_per_clust)-1
+    return (clust_to_sect(_fclust_next) + _sect_per_clust)-1
 
-PUB clustnum2fatsect(cl_nr): fat_sect
+PUB clust_num_to_fat_sect(cl_nr): fat_sect
 ' Convert cluster number to _relative_ FAT sector #
 '   Returns: long
     return (cl_nr >> 7)
 
-PUB clustnum2offs(cl_nr): sect_offs
+PUB clust_num_to_offs(cl_nr): sect_offs
 ' Convert cluster number to byte offset within FAT sector
 '   Returns:
 '       0..508
     return ((cl_nr & $7f) * 4)
 
-PUB clustrd(cl_nr): val
+PUB clust_rd(cl_nr): val
 ' Read cluster number from FAT entry
 '   Returns: cluster number
     val := 0
-    bytemove(@val, (_ptr_fatimg + clustnum2offs(cl_nr)), 4)
+    bytemove(@val, (_ptr_fatimg + clust_num_to_offs(cl_nr)), 4)
 
-PUB clustwr(cl_nr, val)
+PUB clust_wr(cl_nr, val)
 ' Write cluster number to FAT entry
 '   cl_nr: FAT entry
 '   val: cluster number to write into entry
-    bytemove((_ptr_fatimg + clustnum2offs(cl_nr)), @val, 4)
+    bytemove((_ptr_fatimg + clust_num_to_offs(cl_nr)), @val, 4)
 
-PUB dirent2abssect(ent_nr): sect
+PUB dirent_to_abs_sect(ent_nr): sect
 ' Convert directory entry number to _absolute_ directory sector number
 '   (dirents are 32 bytes in length, for a total of 16 entries in a 512-byte sector;
 '   (0..15) / 16 = 0, (16..31) / 16 = 1, etc
-    return (rootdirsect{} + (ent_nr >> 4))
+    return (root_dir_sect{} + (ent_nr >> 4))
 
-PUB dirent2sect(ent_nr): sect
+PUB dirent_to_sect(ent_nr): sect
 ' Convert directory entry number to _relative_ directory sector number
 '   (dirents are 32 bytes in length, for a total of 16 entries in a 512-byte sector;
 '   (0..15) / 16 = 0, (16..31) / 16 = 1, etc
     return (ent_nr >> 4)
 
-PUB direntneverused{}: bool
+PUB dirent_never_used{}: bool
 ' Flag indicating directory entry never used
 '   Returns: boolean
     { first character of filename is NUL? Directory entry was never used }
     return (_dirent[0] == $00)
 
-PUB direntstart(ent_nr)
+PUB dirent_start(ent_nr)
 ' Offset within directory entry sector, given entry number
 '   Returns: integer
     return (ent_nr * DIRENT_LEN)
 
-PUB fat1start{}: s
+PUB fat1_start{}: s
 ' Starting sector of FAT1
 '   Returns: long
     return _sect_fat1_st
 
-PUB fat32name{}: s
+PUB fat32_name{}: s
 ' FAT name (usually FAT32)
 '   Returns: pointer to string buffer
     return @_str_fatnm
     
-PUB fat32version{}: v
+PUB fat32_version{}: v
 ' Version of FAT32 driver
 '   Returns word [major..minor]
     return _fat_ver
 
-PUB fatent2clust(fat_chn): cl
+PUB fat_ent_to_clust(fat_chn): cl
 ' Get cluster number pointed to by FAT entry/chain
     bytemove(@cl, _ptr_fatimg+(fat_chn * 4), 4)
 
@@ -344,7 +344,7 @@ PUB fclose{}
     _fmode := 0
     return 0
 
-PUB fdateacc{}: dsxs
+PUB fdate_acc{}: dsxs
 ' Date file was last accessed
 '   Returns: bitmap
 '       bit 15..9: year from 1980
@@ -352,7 +352,7 @@ PUB fdateacc{}: dsxs
 '       bit 4..0: day
     bytemove(@dsxs, @_dirent+DIRENT_DSXS, 2)
 
-PUB fdatecreated{}: dsc
+PUB fdate_created{}: dsc
 ' Date file was created
 '   Returns: bitmap
 '       bit 15..9: year from 1980 (e.g., 41 = 2021 (80+41-100=21))
@@ -365,36 +365,36 @@ PUB fdeleted{}: d
 '   Returns: boolean
     return (_dirent[0] == FATTR_DEL)            ' FN first char is $E5?
 
-PUB ffirstclust{}: fcl
+PUB ffirst_clust{}: fcl
 ' First cluster of file
 '   Returns: long
     bytemove(@fcl.byte[2], @_dirent[DIRENT_FCLUST_H], 2)
     bytemove(@fcl.byte[0], @_dirent[DIRENT_FCLUST_L], 2)
 
-PUB ffirstsect{}: s
+PUB ffirst_sect{}: s
 ' First sector of file
 '   Returns: long
-    return clust2sect(ffirstclust{})
+    return clust_to_sect(ffirst_clust{})
 
 PUB fend{}: p
 ' Last position in file
     return (fsize{}-1)
 
-PUB fisdir{}: bool
+PUB fis_dir{}: bool
 ' Flag indicating file is a (sub)directory
 '   Returns: boolean
     return ((fattrs{} & FATTR_SUBDIR) <> 0)
 
-PUB fisvolnm{}: bool
+PUB fis_vol_nm{}: bool
 ' Flag indicating file is the volume name
 '   Returns: boolean
     return ((fattrs{} & FATTR_VOL_NM) <> 0)
 
-PUB flastclust{}: cl_nr
+PUB flast_clust{}: cl_nr
 ' Last cluster number of file
     return _fclust_last
 
-PUB fmoddate{}: dsm
+PUB fmod_date{}: dsm
 ' Date file was last modified
 '   Returns: bitmap
 '       bit 15..9: year from 1980
@@ -402,7 +402,7 @@ PUB fmoddate{}: dsm
 '       bit 4..0: day
     bytemove(@dsm, @_dirent+DIRENT_DSM, 2)
 
-PUB fmodtime{}: tsm
+PUB fmod_time{}: tsm
 ' Time file was last modified
 '   Returns: bitmap
 '       bit 15..11: hours
@@ -417,14 +417,14 @@ PUB fname{}: ptr_str
     bytemove(@_fname, @_dirent, 8)
     return @_fname
 
-PUB fnameext{}: ptr_str
+PUB fname_ext{}: ptr_str
 ' File name extension
 '   Returns: pointer to string
     bytefill(@_fext, 0, 4)
     bytemove(@_fext, @_dirent+DIRENT_EXT, 3)
     return @_fext
 
-PUB fnextclust{}: c
+PUB fnext_clust{}: c
 ' Next cluster used by file
     return _fclust_next
 
@@ -433,57 +433,57 @@ PUB fnumber{}: f_no
 '   Returns: integer
     return _file_nr
 
-PUB fphyssize{}: sz
+PUB fphys_size{}: sz
 ' Physical size of file on disk
 '   Returns: maximum size file _could_ currently occupy, based on cluster allocation
-    return (_fclust_tot * clustsz{})
+    return (_fclust_tot * clust_sz{})
 
-PUB fprevclust{}: c
+PUB fprev_clust{}: c
 ' Previous cluster used by file
     return _fclust_prev
 
-PUB fsetattrs(attrs)
+PUB fset_attrs(attrs)
 ' Set file attributes (byte)
     _dirent[DIRENT_ATTRS] := attrs
 
-PUB fsetdateaccessed(dsxs)
+PUB fset_date_accessed(dsxs)
 ' Set file last access date (word)
     bytemove(@_dirent+DIRENT_DSXS, @dsxs, 2)
 
-PUB fsetdatecreated(dsc)
+PUB fset_date_created(dsc)
 ' Set file creation date (word)
     bytemove(@_dirent+DIRENT_DSC, @dsc, 2)
 
-PUB fsetdatemod(dsm)
+PUB fset_date_mod(dsm)
 ' Set file last modified date (word)
     bytemove(@_dirent+DIRENT_DSM, @dsm, 2)
 
-PUB fsetdeleted{}
+PUB fset_deleted{}
 ' Mark file as deleted
     _dirent[0] := FATTR_DEL
 
-PUB fsetext(ptr_str)
+PUB fset_ext(ptr_str)
 ' Set filename extension (pointer to 3-byte string)
     bytemove(@_dirent+DIRENT_EXT, ptr_str, 3)
 
-PUB fsetfirstclust(clust_nr)
+PUB fset_first_clust(clust_nr)
 ' Set file first cluster number (long)
     bytemove(@_dirent+DIRENT_FCLUST_H, @clust_nr.byte[2], 2)
     bytemove(@_dirent+DIRENT_FCLUST_L, @clust_nr.byte[0], 2)
 
-PUB fsetfname(ptr_str)
+PUB fset_fname(ptr_str)
 ' Set filename (pointer to 8-byte string)
     bytemove(@_dirent, ptr_str, 8)
 
-PUB fsetsize(sz)
+PUB fset_size(sz)
 ' Set file size (long)
     bytemove(@_dirent+DIRENT_SZ, @sz, 4)
 
-PUB fsettimecreated(tsc)
+PUB fset_time_created(tsc)
 ' Set file creation time (word)
     bytemove(@_dirent+DIRENT_TSC, @tsc, 2)
 
-PUB fsettimemod(tsm)
+PUB fset_time_mod(tsm)
 ' Set file last modified time (word)
     bytemove(@_dirent+DIRENT_TSM, @tsm, 2)
 
@@ -492,7 +492,7 @@ PUB fsize{}: sz
 '   Returns: long
     bytemove(@sz, @_dirent+DIRENT_SZ, 4)
 
-PUB ftimecreated{}: tsc
+PUB ftime_created{}: tsc
 ' Time file was created
 '   Returns: bitmap (word)
 '       bit 15..11: hours
@@ -500,54 +500,54 @@ PUB ftimecreated{}: tsc
 '       bit 4..0: 2 second intervals
     bytemove(@tsc, @_dirent+DIRENT_TSC, 2)
 
-PUB ftimecreated_ms{}: ms
+PUB ftime_created_ms{}: ms
 ' Timestamp of file creation, in milliseconds
 '   Returns: byte
     return _dirent[DIRENT_TSC_MS]
 
-PUB ftotalclust{}: c
+PUB ftotal_clust{}: c
 ' Total number of clusters occupied by file
 '   Returns: long
 '   NOTE: This value is inferred from known file size, bytes per sector,
 '       and sectors per cluster
     return 1 #> (fsize{} / (_sect_sz * _sect_per_clust))
 
-PUB ftotalsect{}: s
+PUB ftotal_sect{}: s
 ' Total number of sectors occupied by file
 '   Returns: long
 '   NOTE: This value is inferred from known file size and bytes per sector
     return (filesize{} / _sect_sz)
 
-PUB logicalsectsz{}: b
+PUB logical_sect_sz{}: b
 ' Size of logical sector, in bytes
 '   Returns: word
 '   NOTE: Values returned should be powers of 2 only
     return _sect_sz
 
-PUB nextclust{}: c
+PUB next_clust{}: c
 ' Get next cluster number in chain
 '   Returns: long
     c := 0
     { update the next and prev cluster pointers, by following the chain
         read from the FAT }
     _fclust_prev := _fclust_next
-    _fclust_next := fatent2clust(_fclust_prev & $7f)
+    _fclust_next := fat_ent_to_clust(_fclust_prev & $7f)
     if (_fclust_next == CLUST_EOC)               ' End-of-Chain marker reached
         return -1                               '   no more clusters
     return _fclust_next
 
-PUB partstart{}: sect
+PUB part_start{}: sect
 ' Partition starting offset
 '   Returns: long
     return _part_st
 
-PUB readdirent(fnum) | sect_offs
+PUB read_dirent(fnum) | sect_offs
 ' Read metadata about file from dirent # fnum
 '   NOTE: No validation is performed on data in sector buffer
     _file_nr := fnum
 
     { copy the entry into the dirent cache }
-    sect_offs := _ptr_fatimg + direntstart(fnum)
+    sect_offs := _ptr_fatimg + dirent_start(fnum)
     bytefill(@_dirent, 0, DIRENT_LEN)
     bytemove(@_dirent, sect_offs, DIRENT_LEN)
     bytemove(@_fname, @_dirent, 8)
@@ -559,29 +559,29 @@ PUB readdirent(fnum) | sect_offs
     bytemove(@_fclust_next.byte[0], @_dirent+DIRENT_FCLUST_L, 2)
     _fclust_prev := _fclust_next
 
-PUB rootdirclust{}: c
+PUB root_dir_clust{}: c
 ' Cluster number of the start of the root directory
 '   Returns: long
     return _clust_rtdir_st
 
-PUB rootdirsect{}: s
+PUB root_dir_sect{}: s
 ' Starting sector of root directory entry
 '   Returns: long
     return _sect_rtdir_st
 
-PUB sect2clust(sect): clust
+PUB sect_to_clust(sect): clust
 ' Map given sector number to a cluster number
 '   Returns: long
     clust := ((sect - _data_region) / _sect_per_clust)
 
-PUB sectoffs2clust(sect_offs)
+PUB sect_offs_to_clust(sect_offs)
 ' Convert byte offset within FAT sector to cluster number
 '   Valid values: 0..508
     ifnot (lookdown(sect_offs: 0..508))
         return -1
     return (sect_offs / 4)
 
-PUB sectoffs2absclust(sect_offs, fat_sect)
+PUB sect_offs_to_abs_clust(sect_offs, fat_sect)
 ' Convert byte offset within FAT sector to absolute cluster number
 '   Valid values:
 '       sect_offs: 0..508
@@ -590,33 +590,33 @@ PUB sectoffs2absclust(sect_offs, fat_sect)
         return -1
     return ((fat_sect << 7) + (sect_offs / 4))
 
-PUB sectsperclust{}: spc
+PUB sects_per_clust{}: spc
 ' Sectors per cluster (usually 32)
 '   Returns: byte
 '   NOTE: Values returned should be powers of 2 only
     return _sect_per_clust
 
-PUB sectsperfat{}: spf
+PUB sects_per_fat{}: spf
 ' Sectors per FAT
 '   Returns: long
     return _sect_per_fat
 
-PUB sectsz{}: b
+PUB sect_sz{}: b
 ' Number of bytes per sector
 '   Returns: word
     return _sect_sz
 
-PUB sig0x29valid{}: bool
+PUB sig0x29_valid{}: bool
 ' Flag indicating signature byte 0x29 is valid
 '   Returns: boolean
     return _sigx29 == $29
 
-PUB sig0xaa55valid{}: bool
+PUB sig0xaa55_valid{}: bool
 ' Flag indicating signature word 0xAA55 is valid
 '   Returns: boolean
     return (_sigxaa55 == SIG_WORD)
 
-PUB volname{}: ptr_str
+PUB vol_name{}: ptr_str
 ' Volume name of FAT partition
 '   Returns: pointer to 11-char string
     return @_str_vol_nm
