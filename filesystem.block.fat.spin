@@ -3,9 +3,9 @@
     Filename: filesystem.block.fat.spin
     Author: Jesse Burt
     Description: FAT filesystem engine
-    Copyright (c) 2022
+    Copyright (c) 2023
     Started Aug 1, 2021
-    Updated Aug 23, 2022
+    Updated Mar 26, 2023
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -161,7 +161,7 @@ VAR
 
     { current file }
     long _fclust_next, _fclust_prev, _fclust_last, _fclust_tot
-    long _fseek_pos, _fseek_sect
+    long _fseek_pos, _fseek_sect, _fseek_prev_sect
     byte _fname[8+1], _fext[3+1], _fmode
 
 OBJ
@@ -173,7 +173,7 @@ PUB null{}
 
 PUB init(ptr_fatimg)
 ' Initialize
-'   ptr_fatimg: pointer to FAT sector buffer
+'   ptr_fatimg: pointer to FAT metadata sector buffer
     _ptr_fatimg := ptr_fatimg
     _file_nr := -1
 
@@ -368,8 +368,9 @@ PUB fdeleted{}: d
 PUB ffirst_clust{}: fcl
 ' First cluster of file
 '   Returns: long
-    bytemove(@fcl.byte[2], @_dirent[DIRENT_FCLUST_H], 2)
-    bytemove(@fcl.byte[0], @_dirent[DIRENT_FCLUST_L], 2)
+    bytemove(@fcl, @_dirent[DIRENT_FCLUST_H], 2)
+    fcl <<= 16
+    bytemove(@fcl, @_dirent[DIRENT_FCLUST_L], 2)
 
 PUB ffirst_sect{}: s
 ' First sector of file
