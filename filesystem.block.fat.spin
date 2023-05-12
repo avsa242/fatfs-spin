@@ -5,7 +5,7 @@
     Description: FAT filesystem engine
     Copyright (c) 2023
     Started Aug 1, 2021
-    Updated Mar 26, 2023
+    Updated May 12, 2023
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -132,6 +132,7 @@ CON
     { offsets within root dir sector }
     DIRENT_LEN      = 32
     DIRENTS         = 16                        ' dirents per sector
+    LAST_DIRENT     = DIRENTS-1
     DIRENT_FN       = $00                       ' filename
     DIRENT_EXT      = $08                       ' filename extension
     DIRENT_ATTRS    = $0B                       ' file attributes
@@ -263,23 +264,30 @@ PUB clust_num_to_fat_sect(cl_nr): fat_sect
 '   Returns: long
     return (cl_nr >> 7)
 
-PUB clust_num_to_offs(cl_nr): sect_offs
-' Convert cluster number to byte offset within FAT sector
-'   Returns:
-'       0..508
-    return ((cl_nr & $7f) * 4)
-
-PUB clust_rd(cl_nr): val
+PUB clust_rd(fat_entry): val
 ' Read cluster number from FAT entry
 '   Returns: cluster number
     val := 0
-    bytemove(@val, (_ptr_fatimg + clust_num_to_offs(cl_nr)), 4)
+    bytemove(@val, (_ptr_fatimg + fat_entry_sector_offset(fat_entry)), 4)
 
-PUB clust_wr(cl_nr, val)
+PUB clust_wr(fat_entry, val)
 ' Write cluster number to FAT entry
-'   cl_nr: FAT entry
+'   fat_entry: FAT entry
 '   val: cluster number to write into entry
-    bytemove((_ptr_fatimg + clust_num_to_offs(cl_nr)), @val, 4)
+    bytemove((_ptr_fatimg + fat_entry_sector_offset(fat_entry)), @val, 4)
+
+PUB dirent_filename(dirent_fn): fnstr | tmp[4], ptr
+' Get filename of directory entry
+'   dirent_fn: dirent number of file
+'   Returns:
+'       string containing name of file
+    longfill(@tmp, 0, 4)
+    ptr := @tmp
+    bytemove(ptr, dirent_fn, 8)
+    ptr += 8
+    byte[ptr++] := "."
+    bytemove(ptr, dirent_fn+9, 3)
+    return @tmp
 
 PUB dirent_to_abs_sect(ent_nr): sect
 ' Convert directory entry number to _absolute_ directory sector number
@@ -319,9 +327,19 @@ PUB fat32_version{}: v
 '   Returns word [major..minor]
     return _fat_ver
 
-PUB fat_ent_to_clust(fat_chn): cl
+PUB fat_entry_abs_to_rel(fat_entry): ent_rel
+' Convert absolute FAT entry number to relative (0..127)
+    return (fat_entry & $7f)
+
+PUB fat_entry_to_clust(fat_chn): cl
 ' Get cluster number pointed to by FAT entry/chain
     bytemove(@cl, _ptr_fatimg+(fat_chn * 4), 4)
+
+PUB fat_entry_sector_offset(fat_entry): sect_offs
+' Convert FAT entry to byte offset within FAT sector
+'   Returns:
+'       0..508
+    return ((fat_entry & $7f) * 4)
 
 PUB fattrs{}: a
 ' File attributes
@@ -368,6 +386,7 @@ PUB fdeleted{}: d
 PUB ffirst_clust{}: fcl
 ' First cluster of file
 '   Returns: long
+    fcl := 0
     bytemove(@fcl, @_dirent[DIRENT_FCLUST_H], 2)
     fcl <<= 16
     bytemove(@fcl, @_dirent[DIRENT_FCLUST_L], 2)
@@ -532,7 +551,7 @@ PUB next_clust{}: c
     { update the next and prev cluster pointers, by following the chain
         read from the FAT }
     _fclust_prev := _fclust_next
-    _fclust_next := fat_ent_to_clust(_fclust_prev & $7f)
+    _fclust_next := fat_entry_to_clust(_fclust_prev & $7f)
     if (_fclust_next == CLUST_EOC)               ' End-of-Chain marker reached
         return -1                               '   no more clusters
     return _fclust_next
