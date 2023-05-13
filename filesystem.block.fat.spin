@@ -5,7 +5,7 @@
     Description: FAT filesystem engine
     Copyright (c) 2023
     Started Aug 1, 2021
-    Updated May 12, 2023
+    Updated May 13, 2023
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -100,7 +100,7 @@ VAR
 
     long _data_region
     long _endofchain
-    long _sect_fat1_st
+    long _sect_fat1_st, _sect_fat2_st
     long _part_st
     long _rootdir
     long _rootdirend
@@ -222,6 +222,8 @@ PUB read_bpb{} | tmp
     bytemove(@_str_vol_nm, _ptr_fatimg+VOLNM, VOLNM_LEN)
 
     _sect_fat1_st := _part_st + _sect_rsvd
+    _sect_fat2_st := _sect_fat1_st + _sect_per_fat
+
     _clust_shf := math.log2(_sect_per_clust)
 
     _root_ents := 16 << _clust_shf 'xxx where's 16 come from?
@@ -316,6 +318,11 @@ PUB fat1_start{}: s
 ' Starting sector of FAT1
 '   Returns: long
     return _sect_fat1_st
+
+PUB fat2_start{}: s
+' Starting sector of FAT2
+'   Returns: long
+    return _sect_fat2_st
 
 PUB fat32_name{}: s
 ' FAT name (usually FAT32)
