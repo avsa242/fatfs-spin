@@ -564,7 +564,7 @@ PUB part_start{}: sect
 PUB read_dirent(fnum) | sect_offs
 ' Read metadata about file from dirent # fnum
 '   NOTE: No validation is performed on data in sector buffer
-    _file_nr := fnum
+'    _file_nr := fnum
 
     { copy the entry into the dirent cache }
     sect_offs := _ptr_fatimg + dirent_start(fnum)
