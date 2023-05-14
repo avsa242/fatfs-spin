@@ -5,7 +5,7 @@
     Description: FAT filesystem engine
     Copyright (c) 2023
     Started Aug 1, 2021
-    Updated May 13, 2023
+    Updated May 14, 2023
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -265,18 +265,6 @@ PUB clust_num_to_fat_sect(cl_nr): fat_sect
 ' Convert cluster number to _relative_ FAT sector #
 '   Returns: long
     return (cl_nr >> 7)
-
-PUB clust_rd(fat_entry): val
-' Read cluster number from FAT entry
-'   Returns: cluster number
-    val := 0
-    bytemove(@val, (_ptr_fatimg + fat_entry_sector_offset(fat_entry)), 4)
-
-PUB clust_wr(fat_entry, val)
-' Write cluster number to FAT entry
-'   fat_entry: FAT entry
-'   val: cluster number to write into entry
-    bytemove((_ptr_fatimg + fat_entry_sector_offset(fat_entry)), @val, 4)
 
 PUB dirent_filename(dirent_fn): fnstr | tmp[4], ptr
 ' Get filename of directory entry
@@ -568,6 +556,12 @@ PUB part_start{}: sect
 '   Returns: long
     return _part_st
 
+PUB read_fat_entry(fat_entry): val
+' Read cluster number from FAT entry
+'   Returns: cluster number 0..127
+    val := 0
+    bytemove(@val, (_ptr_fatimg + fat_entry_sector_offset(fat_entry)), 4)
+
 PUB read_dirent(fnum) | sect_offs
 ' Read metadata about file from dirent # fnum
 '   NOTE: No validation is performed on data in sector buffer
@@ -648,9 +642,15 @@ PUB vol_name{}: ptr_str
 '   Returns: pointer to 11-char string
     return @_str_vol_nm
 
+PUB write_fat_entry(fat_entry, val)
+' Write cluster number to FAT entry
+'   fat_entry: FAT entry (0..127)
+'   val: cluster number to write into entry
+    bytemove((_ptr_fatimg + fat_entry_sector_offset(fat_entry)), @val, 4)
+
 DAT
 {
-Copyright 2022 Jesse Burt
+Copyright 2023 Jesse Burt
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
