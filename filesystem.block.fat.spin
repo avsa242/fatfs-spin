@@ -252,10 +252,6 @@ PUB clust_to_sect(clust_nr): sect
         starts }
     return _data_region + (_sect_per_clust * clust_nr)
 
-PUB clust_is_eoc(clust_nr): iseoc
-' Flag indicating cluster is end-of-chain
-    return (lookdown(clust_nr: CLUST_EOC0..CLUST_EOC) <> 0)
-
 PUB clust_last_sect{}: sect
 ' Last sector of cluster
 '   Returns: long
@@ -301,6 +297,10 @@ PUB dirent_start(ent_nr)
 ' Offset within directory entry sector, given entry number
 '   Returns: integer
     return (ent_nr * DIRENT_LEN)
+
+PUB fat_entry_is_eoc(clust_nr): iseoc
+' Flag indicating cluster is end-of-chain
+    return (lookdown(clust_nr: CLUST_EOC0..CLUST_EOC) <> 0)
 
 PUB fat1_start{}: s
 ' Starting sector of FAT1
