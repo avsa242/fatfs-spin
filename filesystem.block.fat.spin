@@ -5,7 +5,7 @@
     Description: FAT filesystem engine
     Copyright (c) 2023
     Started Aug 1, 2021
-    Updated May 14, 2023
+    Updated May 16, 2023
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -483,8 +483,8 @@ PUB fset_ext(ptr_str)
 
 PUB fset_first_clust(clust_nr)
 ' Set file first cluster number (long)
-    bytemove(@_dirent+DIRENT_FCLUST_H, @clust_nr.byte[2], 2)
-    bytemove(@_dirent+DIRENT_FCLUST_L, @clust_nr.byte[0], 2)
+    bytemove(@_dirent+DIRENT_FCLUST_H, @clust_nr+2, 2)
+    bytemove(@_dirent+DIRENT_FCLUST_L, @clust_nr, 2)
 
 PUB fset_fname(ptr_str)
 ' Set filename (pointer to 8-byte string)
