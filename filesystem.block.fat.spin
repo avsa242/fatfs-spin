@@ -3,9 +3,8 @@
     Filename: filesystem.block.fat.spin
     Author: Jesse Burt
     Description: FAT filesystem engine
-    Copyright (c) 2023
     Started Aug 1, 2021
-    Updated May 16, 2023
+    Updated Mar 10, 2024
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -262,17 +261,17 @@ PUB clust_num_to_fat_sect(cl_nr): fat_sect
 '   Returns: long
     return (cl_nr >> 7)
 
-PUB dirent_filename(dirent_fn): fnstr | tmp[4], ptr
+PUB dirent_filename(d_fn): fnstr | tmp[4], ptr
 ' Get filename of directory entry
 '   dirent_fn: dirent number of file
 '   Returns:
 '       string containing name of file
     longfill(@tmp, 0, 4)
     ptr := @tmp
-    bytemove(ptr, dirent_fn, 8)
+    bytemove(ptr, d_fn, 8)
     ptr += 8
     byte[ptr++] := "."
-    bytemove(ptr, dirent_fn+9, 3)
+    bytemove(ptr, d_fn+9, 3)
     return @tmp
 
 PUB dirent_to_abs_sect(ent_nr): sect
@@ -650,7 +649,7 @@ PUB write_fat_entry(fat_entry, val)
 
 DAT
 {
-Copyright 2023 Jesse Burt
+Copyright 2024 Jesse Burt
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
