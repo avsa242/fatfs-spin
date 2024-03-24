@@ -458,6 +458,24 @@ PUB fnext_clust(): c
 ' Next cluster used by file
     return _fclust_next
 
+pub fnstr_to_dirent(p_str) | ffnl, fnl
+' Convert a dot-separated filename+extension string to a space-padded, capitalized string
+    ffnl := strsize(p_str)                      ' full filename length
+    bytefill(@_nm, 0, 12)
+    str.toupper(p_str)
+    if ( ffnl < 12 )
+        { shorter than 12 chars - need to space-pad the filename }
+        fnl := ffnl-4                                   ' filename only length (exclude ".EXT")
+        bytemove(@_nm, str.left(p_str, fnl, 0), fnl)    ' copy the filename provided
+        bytefill(@_nm+fnl, " ", (8-fnl))                ' pad with spaces
+        bytemove(@_nm+8, str.right(p_str, 3, 0), 3)     ' copy the suffix, without the "."
+        str.clear_scratch_buff()
+    else
+        bytemove(@_nm, p_str, 8)
+        bytemove(@_nm+8, p_str+9, 3)
+
+    return @_nm
+
 PUB fnumber(): f_no
 ' File number within directory
 '   Returns: integer
@@ -647,25 +665,6 @@ pub set_filename(p_str)
 '   p_str: string containing the filename
 '   NOTE: The source string is expected to contain the filename and suffix/extension, without a "."
     bytemove(@_dirent+DIRENT_FN, p_str, 11)
-
-pub fnstr_to_dirent(p_str) | ffnl, fnl
-' Convert a dot-separated filename+extension string to a space-padded, capitalized string
-    ffnl := strsize(p_str)                      ' full filename length
-    bytefill(@_nm, 0, 12)
-    str.toupper(p_str)
-    if ( ffnl < 12 )
-        { shorter than 12 chars - need to space-pad the filename }
-        fnl := ffnl-4                                   ' filename only length (exclude ".EXT")
-        bytemove(@_nm, str.left(p_str, fnl, 0), fnl)    ' copy the filename provided
-        bytefill(@_nm+fnl, " ", (8-fnl))                ' pad with spaces
-        bytemove(@_nm+8, str.right(p_str, 3, 0), 3)     ' copy the suffix, without the "."
-        str.clear_scratch_buff()
-    else
-        bytemove(@_nm, p_str, 8)
-        bytemove(@_nm+8, p_str+9, 3)
-
-    return @_nm
-
 
 PUB sig0x29_valid(): bool
 ' Flag indicating signature byte 0x29 is valid
