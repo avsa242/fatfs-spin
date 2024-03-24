@@ -652,7 +652,7 @@ pub fnstr_to_dirent(p_str) | ffnl, fnl
 ' Convert a dot-separated filename+extension string to a space-padded, capitalized string
     ffnl := strsize(p_str)                      ' full filename length
     bytefill(@_nm, 0, 12)
-
+    str.toupper(p_str)
     if ( ffnl < 12 )
         { shorter than 12 chars - need to space-pad the filename }
         fnl := ffnl-4                                   ' filename only length (exclude ".EXT")
