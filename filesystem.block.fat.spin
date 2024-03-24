@@ -286,6 +286,18 @@ PUB dirent_to_sect(ent_nr): sect
 '   (0..15) / 16 = 0, (16..31) / 16 = 1, etc
     return (ent_nr >> 4)
 
+var byte _nm[8+3+1]
+pub dirent_name(d): p_str
+' Get the filename from a directory entry
+'   d: directory entry number (0..15)
+'   NOTE: A directory sector must be read into the metadata buffer
+    if ( (d < 0) or (d > 15) )
+        return EINVAL                           ' reject invalid directory entry numbers
+
+    bytefill(@_nm, 0, 8+3+1)
+    bytemove(@_nm, _ptr_fatimg + (d*DIRENT_LEN), 8+3)
+    return @_nm
+
 PUB dirent_never_used{}: bool
 ' Flag indicating directory entry never used
 '   Returns: boolean
