@@ -1,12 +1,12 @@
 {
-    --------------------------------------------
-    Filename: filesystem.block.fat.spin
-    Author: Jesse Burt
-    Description: FAT filesystem engine
-    Started Aug 1, 2021
-    Updated Mar 10, 2024
-    See end of file for terms of use.
-    --------------------------------------------
+---------------------------------------------------------------------------------------------------
+    Filename:       filesystem.block.fat.spin
+    Description:    FAT filesystem engine
+    Author:         Jesse Burt
+    Started:        Aug 1, 2021
+    Updated:        Mar 24, 2024
+    Copyright (c) 2024 - See end of file for terms of use.
+---------------------------------------------------------------------------------------------------
 }
 
 CON
@@ -659,6 +659,15 @@ PUB sect_sz(): b
 ' Number of bytes per sector
 '   Returns: word
     return _sect_sz
+
+pub set_dirent_name(d, p_str)
+' Set the specified directory entry's filename in the currently buffered directory table sector
+'   d:      directory entry (0..15)
+'   p_str:  string containing the filename
+'   NOTE: The source string is expected to contain the filename and suffix/extension, without a "."
+    if ( (d < 0) or (d > 15) )
+        return EINVAL
+    bytemove(_ptr_fatimg + (d * DIRENT_LEN), p_str, 11)
 
 pub set_filename(p_str)
 ' Set the cached directory entry's filename
