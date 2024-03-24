@@ -642,6 +642,12 @@ PUB sect_sz(): b
 '   Returns: word
     return _sect_sz
 
+pub set_filename(p_str)
+' Set the cached directory entry's filename
+'   p_str: string containing the filename
+'   NOTE: The source string is expected to contain the filename and suffix/extension, without a "."
+    bytemove(@_dirent+DIRENT_FN, p_str, 11)
+
 PUB sig0x29_valid(): bool
 ' Flag indicating signature byte 0x29 is valid
 '   Returns: boolean
