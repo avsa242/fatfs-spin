@@ -239,6 +239,10 @@ PUB active_fat(): fat_nr
 '   Returns: u7
     return _fat_actv & $7F
 
+PUB clear_dirent()
+' Clear the cached directory entry
+    bytefill(@_dirent, 0, DIRENT_LEN)
+
 PUB clust_sz(): b
 ' Number of bytes per cluster:
 '   Returns: long
@@ -542,7 +546,7 @@ PUB ftotal_sect(): s
 ' Total number of sectors occupied by file
 '   Returns: long
 '   NOTE: This value is inferred from known file size and bytes per sector
-    return (filesize() / _sect_sz)
+    return (fsize() / _sect_sz)
 
 PUB logical_sect_sz(): b
 ' Size of logical sector, in bytes
